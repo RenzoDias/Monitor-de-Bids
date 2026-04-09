@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CFE Monitor — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+header{background:linear-gradient(135deg,#1a237e,#283593);padding:18px 32px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px #0008}
+header h1{font-size:1.35rem;font-weight:700}
+.container{max-width:1700px;margin:0 auto;padding:22px}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:#1e293b;border-radius:10px;padding:18px 22px;border-left:4px solid var(--cor)}
+.kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;opacity:.6;margin-bottom:5px}
+.kpi-value{font-size:2rem;font-weight:800;color:var(--cor)}
+.kpi-sub{font-size:.72rem;opacity:.45;margin-top:3px}
+
+/* ── Filtros ── */
+.filtros{background:#1e293b;border-radius:10px;padding:14px 18px;margin-bottom:20px}
+.filtros-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.f-group{display:flex;flex-direction:column;gap:4px}
+.f-group label{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;opacity:.55}
+.f-group input[type=date],
+.f-group input[type=text]{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 10px;border-radius:7px;font-size:.82rem;width:140px}
+/* Multi-select estilo custom */
+.ms-wrap{position:relative}
+.ms-btn{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:7px 30px 7px 10px;border-radius:7px;font-size:.82rem;min-width:150px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms-btn:after{content:'▾';margin-left:6px;opacity:.6;flex-shrink:0}
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#1e293b;border:1px solid #334155;border-radius:8px;min-width:190px;max-height:260px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px #0008}
+.ms-dropdown.open{display:block}
+.ms-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:.82rem}
+.ms-item:hover{background:#263548}
+.ms-item input[type=checkbox]{accent-color:#3b82f6;width:14px;height:14px;cursor:pointer}
+.ms-item .dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.ms-clear{padding:6px 12px;font-size:.72rem;opacity:.5;border-top:1px solid #334155;cursor:pointer;text-align:right}
+.ms-clear:hover{opacity:1}
+.btn-reset{background:#334155;border:none;color:#e2e8f0;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:.82rem}
+.btn-reset:hover{background:#475569}
+
+.charts{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:20px}
+.chart-box{background:#1e293b;border-radius:10px;padding:18px}
+.chart-box h3{font-size:.82rem;opacity:.6;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+.chart-wrap{position:relative;height:290px}
+
+.table-wrap{background:#1e293b;border-radius:10px;padding:18px;overflow-x:auto}
+.table-wrap h3{font-size:.82rem;opacity:.6;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.table-info{font-size:.78rem;opacity:.45;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead tr{background:#0f172a}
+th{padding:9px 11px;text-align:left;font-weight:600;opacity:.65;white-space:nowrap;border-bottom:1px solid #334155;cursor:pointer;user-select:none}
+th:hover{opacity:1}
+td{padding:8px 11px;border-bottom:1px solid #1e293b;vertical-align:top}
+tr:hover td{background:#263548}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:.7rem;font-weight:600;white-space:nowrap}
+.badge-novo{background:#1b5e20;color:#fff}
+.badge-atualizado{background:#e65100;color:#fff}
+.badge-sem{background:#37474f;color:#ccc}
+.area-badge{display:inline-block;padding:2px 9px;border-radius:4px;font-size:.73rem;font-weight:700;color:#fff;white-space:nowrap}
+.nuclear-row td{background:#1a0505!important;color:#ffcdd2}
+.nuclear-row:hover td{background:#2d0808!important}
+.prazo-urgente{color:#f87171;font-weight:700}
+.prazo-normal{color:#86efac}
+.paginacao{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:.8rem;opacity:.55}
+.paginacao button{background:#334155;border:none;color:#e2e8f0;padding:5px 12px;border-radius:6px;cursor:pointer;margin:0 2px}
+.paginacao button:hover{background:#475569}
+.paginacao button.active{background:#3b82f6;color:#fff;opacity:1}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>⚡ CFE Monitor — Dashboard de Licitações</h1><span id="header-sub">Carregando...</span></div>
+  <span style="font-size:.78rem;opacity:.55">Atualizado: 09/04/2026 15:44</span>
+</header>
+<div class="container">
+
+  <div class="kpis">
+    <div class="kpi" style="--cor:#3b82f6"><div class="kpi-label">Total de Licitações</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub" id="kpi-sub-total"></div></div>
+    <div class="kpi" style="--cor:#22c55e"><div class="kpi-label">Dias Monitorados</div><div class="kpi-value" id="kpi-dias">—</div><div class="kpi-sub" id="kpi-sub-dias"></div></div>
+    <div class="kpi" style="--cor:#a78bfa"><div class="kpi-label">Média / Dia</div><div class="kpi-value" id="kpi-media">—</div><div class="kpi-sub">licitações/dia</div></div>
+    <div class="kpi" style="--cor:#ef4444"><div class="kpi-label">⚠ Nuclear</div><div class="kpi-value" id="kpi-nuclear">—</div><div class="kpi-sub">prioridade máxima</div></div>
+  </div>
+
+  <div class="filtros">
+    <div class="filtros-row">
+
+      <div class="f-group">
+        <label>Área (múltipla)</label>
+        <div class="ms-wrap" id="ms-area">
+          <div class="ms-btn" onclick="toggleDropdown('ms-area')"><span id="ms-area-label">Todas as áreas</span></div>
+          <div class="ms-dropdown" id="ms-area-dd"></div>
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label>Tipo (múltiplo)</label>
+        <div class="ms-wrap" id="ms-tipo">
+          <div class="ms-btn" onclick="toggleDropdown('ms-tipo')"><span id="ms-tipo-label">Todos os tipos</span></div>
+          <div class="ms-dropdown" id="ms-tipo-dd"></div>
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label>Status (múltiplo)</label>
+        <div class="ms-wrap" id="ms-status">
+          <div class="ms-btn" onclick="toggleDropdown('ms-status')"><span id="ms-status-label">Todos</span></div>
+          <div class="ms-dropdown" id="ms-status-dd"></div>
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label>Mês/Ano (múltiplo)</label>
+        <div class="ms-wrap" id="ms-mes">
+          <div class="ms-btn" onclick="toggleDropdown('ms-mes')"><span id="ms-mes-label">Todos</span></div>
+          <div class="ms-dropdown" id="ms-mes-dd"></div>
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label>Data início</label>
+        <input type="date" id="f-data-ini">
+      </div>
+      <div class="f-group">
+        <label>Data fim</label>
+        <input type="date" id="f-data-fim">
+      </div>
+
+      <div class="f-group">
+        <label>Buscar</label>
+        <input type="text" id="f-busca" placeholder="Número ou descrição...">
+      </div>
+      <div class="f-group">
+        <label>&nbsp;</label>
+        <button class="btn-reset" onclick="resetarFiltros()">↺ Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-box"><h3>Licitações por Dia</h3><div class="chart-wrap"><canvas id="chart-dias"></canvas></div></div>
+    <div class="chart-box"><h3>Distribuição por Área</h3><div class="chart-wrap"><canvas id="chart-areas"></canvas></div></div>
+  </div>
+
+  <div class="table-wrap">
+    <h3>Registros</h3>
+    <div class="table-info" id="table-info"></div>
+    <table>
+      <thead><tr>
+        <th onclick="st('status')">Status ↕</th>
+        <th onclick="st('data')">Data ↕</th>
+        <th onclick="st('numero')">Número ↕</th>
+        <th onclick="st('descricao')">Descrição ↕</th>
+        <th onclick="st('area')">Área ↕</th>
+        <th onclick="st('tipo')">Tipo ↕</th>
+        <th onclick="st('prazo')">Prazo Submissão ↕</th>
+        <th onclick="st('julgamento')">Julgamento ↕</th>
+        <th onclick="st('estado')">Estado ↕</th>
+        <th onclick="st('campos_alterados')">Campos Alterados ↕</th>
+        <th>Justificativa</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="paginacao"><span id="pag-info"></span><div id="pag-btns"></div></div>
+  </div>
+</div>
+
+<script>
+const DADOS_RAW      = [{"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0001-CAAAT-0029-2026", "descricao": "Adquisición de Pistas y Esferas de Molienda para Pulverizadores de Carbón para la Central Termoeléctrica José López Portillo", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "pistas esferas molienda pulverizadores carbón termoeléctrica", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0013-CSAAN-0019-2026", "descricao": "PARTES DE PEPUESTO PARA LA BOMBA DEL SISTEMA CTCS/N74", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "partes repuesto bomba sistema CTCS/N74", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0013-CSAAN-0020-2026", "descricao": "PARTES DE REPUESTO PARA LA BOMBA DEL SISTEMA EDR/G22", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "partes repuesto bomba sistema EDR/G22", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0029-CSSAN-0002-2026", "descricao": "Servicio de administración de combustible para carga a los vehículos oficiales de la Residencia General de Construcción III, Manzanillo.", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Colima", "justificativa": "administración combustible vehículos oficiales construcción", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0050-CSAAN-0003-2026", "descricao": "TUBERÍA DE POLIETILENO PARA LA RESIDENCIA LOS AZUFRES, MICH", "area": "Serviços Gerais", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "tubería polietileno para residencia Los Azufres", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0051-CSSAN-0012-2026", "descricao": "MANTENIMIENTO Y RECARGA DE EXTINTORES", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California", "justificativa": "mantenimiento recarga extintores seguridad industrial", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0100-CACON-0008-2026", "descricao": "CONSTRUCCIÓN DE OBRA CIVIL Y ELECTROMECÁNICA DE SUBESTACIÓN UNIDAD DEPORTIVA T1 (1T-10 MVA 138/13.8KV 2/6A + 2.4MVAR) ACOMETIDA LAT 138 KV Y SALIDA DE 6 CIRCUITOS DE MT EN ZONA NUEVO LAREDO.", "area": "Transmissão", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "construcción subestación Unidad Deportiva 138 kV", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0100-CASON-0002-2026", "descricao": "Servicio de Director Responsable de Obra para el proyecto 274 SE 1620 Distribución Valle de México (2a FASE).", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "director responsable obra subestación distribución", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0101-CSAAN-0003-2026", "descricao": "ESLABON FUSIBLE", "area": "Distribuição", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California", "justificativa": "eslabón fusible protección sistema eléctrico", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0102-CASON-0001-2026", "descricao": "Zona Irapuato: Elaboración del Proyecto Ejecutivo de la S.E. los Olivos.", "area": "Transmissão", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "elaboración proyecto ejecutivo subestación Los Olivos", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0102-CASON-0002-2026", "descricao": "Zona Querétaro: Elaboración del Proyecto Ejecutivo de la S.E. Carlota", "area": "Transmissão", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "elaboración proyecto ejecutivo subestación Carlota", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0102-CASON-0003-2026", "descricao": "Zona Irapuato: Elaboración del Proyecto Ejecutivo de la S.E. Los Fresnos", "area": "Transmissão", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "elaboración proyecto ejecutivo subestación Los Fresnos", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0106-CSAAA-0011-2026", "descricao": "D137 Equipo de Protección Personal", "area": "Serviços Gerais", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Puebla", "justificativa": "equipo protección personal seguridad trabajadores", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0108-CACON-0016-2026", "descricao": "\"CONSTRUCCIÓN DE REDES AÉREAS Y SUBTERRÁNEAS DE MEDIA Y BAJA TENSIÓN EN EL ÁMBITO DE LA ZONA DE DISTRIBUCIÓN CÓRDOBA APORTACIONES 2026\"", "area": "Distribuição", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "construção redes aéreas subterrâneas média baixa tensão", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0109-CACON-0041-2026", "descricao": "\"ATENCION A FALSOS CONTACTOS ZONA ERMITA 2026 DE LA DIVISION VALLE DE MÉXICO SUR.\"", "area": "Distribuição", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "atención falsos contactos zona Ermita distribución", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0110-CSSAN-0085-2026", "descricao": "ZIT-003-2026 SERVICIO DE MANTENIMIENTO A BASES Y ACOMETIDAS", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "servicio mantenimiento bases acometidas", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0112-CSAAA-0005-2026", "descricao": "Reguladores de Tensión – Partidas desiertas", "area": "Distribuição", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Oaxaca", "justificativa": "reguladores tensión partidas desiertas", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0114-CSAAA-0007-2026", "descricao": "BATERÍAS PARA EPROSEC", "area": "TI/Sistemas", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "baterías para sistema EPROSEC", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0207-CSAAN-0004-2026", "descricao": "SERVICIO DE INSTALACIÓN DE REACTOR DE AMORTIGUAMIENTO EN LA SUBESTACIÓN VERACRUZ DOS\t", "area": "Nuclear", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "instalación reactor amortiguamiento subestación Veracruz", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0207-CSAAN-0005-2026", "descricao": "SERVICIO DE REHABILITACIÓN DE BANCO DE CAPACITORES SINIESTRADO DE LA SUBESTACIÓN VERACRUZ UNO 115 kV\t\t", "area": "Transmissão", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "rehabilitación banco capacitores subestación Veracruz", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0400-CSAAA-0019-2026", "descricao": "ADQUISICIÓN DEL ESQUEMA DE MEDICIÓN PARA  LIQUIDACIÓN DE LA C.H. PORTEZUELO I Y II", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "esquema medición liquidación central hidroeléctrica Portezuelo", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0600-CASAT-0001-2026", "descricao": "Servicio de Limpieza Química y Soplado con Vapor del Generador de Vapor por Recuperación de Calor Unidad 04 de la C.C.C. Empalme", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "limpieza química generador vapor central Empalme", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0613-CSAAN-0010-2026", "descricao": "ADQUISICION DE REFACCIONES Y SERVICIO DE REPARACION DE COMPONENTES PARA LA TURBINA DE VAPOR MARCA DOOSAN-SKODA POWER, MODELO MTD-70 CR DE LA UNIDAD 6 DE LA C.C.C. EMPALME", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "refacciones turbina vapor central Empalme", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0613-CSSAN-0040-2026", "descricao": "SERVICIO DE MANTENIMIENTO Y SOPORTE TÉCNICO A CONTROLADORES LÓGICOS PROGRAMABLES DE LA C.C.C. EMPALME", "area": "TI/Sistemas", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "mantenimiento controladores lógicos programables central Empalme", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0616-CSCON-0001-2026", "descricao": "Mantenimiento al sistema anticorrosivo interior de la tubería de presión de la C.H. Humaya", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sinaloa", "justificativa": "mantenimiento sistema anticorrosivo tubería central Humaya", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0617-CSAAN-0021-2026", "descricao": "ADQUISICIÓN DE REFACCIONES Y MATERIALES MECÁNICOS PARA MANTENIMIENTO PARA LAS CENTRALES HIDROELÉCTRICAS 27 DE SEPTIEMBRE Y LUIS DONALDO COLOSIO MURRIETA", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sinaloa", "justificativa": "refacciones materiales centrales hidroeléctricas 27 Septiembre", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0617-CSSAN-0012-2026", "descricao": "Servicio de transporte de personal sindicalizado de la C.H. 27 de Septiembre", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sinaloa", "justificativa": "transporte personal sindicalizado central 27 Septiembre", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0700-CSSAN-0041-2026", "descricao": "(HC61) Servicio de recolección y disposición de residuos de manejo especial y peligrosos de la CCC Huinalá (Tercera vuelta)”", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "recolección disposición residuos peligrosos central Huinalá", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0920-CSSAN-0012-2026", "descricao": "600547691 LIMPIEZA QUÍMICA INTEGRAL AL GENERADOR DE VAPOR UNIDAD 1 DE LA CENTRAL TERMOELÉCTRICA MÉRIDA II", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "limpieza química generador vapor termoeléctrica Mérida", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0929-CSAAA-0005-2026", "descricao": "500665865 ADQUISICIÓN DE ACUMULADORES Y VEJIGAS PARA EL SISTEMA DE ACEITE DE CONTROL DE LAS TURBINAS DE VAPOR DE LA CENTRAL CICLO COMBINADO POZA RICA", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "acumuladores sistema aceite turbinas Poza Rica", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-09", "origem": "CFE", "numero": "CFE-0930-CSAAN-0007-2026", "descricao": "500665784.- ADQUISICION DE CALZADO DIELECTRICO DE TRABAJO DOTACION 2026, PARA LAS CENTRALES HIDROELECTRICAS DE LA SUBGERENCIA DE PRODUCCION HIDROELECTRICA GRIJALVA", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "calzado dieléctrico centrales hidroeléctricas Grijalva", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0001-CASAN-0009-2026", "descricao": "Servicio de Vigilancia del Centro Nacional de Capacitación Sureste", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "servicio vigilancia Centro Capacitação Sureste", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0004-CACON-0022-2026", "descricao": "Compensación capacitiva en la zona Tecate P21-BC2, (Segunda Convocatoria).", "area": "Transmissão", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "compensação capacitiva zona Tecate", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0012-CSAAA-0014-2026", "descricao": "Adquisición equipo contador láser de partículas", "area": "TI/Sistemas", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "adquisição equipo contador láser partículas", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0012-CSAAA-0015-2026", "descricao": "Adquisición de microscopio electrónico 4K", "area": "TI/Sistemas", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "adquisição microscópio electrónico 4K", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0013-CASAN-0005-2026", "descricao": "COMPRESORES PARA EL ABASTECIMIENTO DE AIRE DE SERVICIO ", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "compressores abastecimento aire servicio", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0013-CSAAN-0017-2026", "descricao": "EQUIPAMIENTO OPERATIVO DE LA SUBGERENCIA DE MANTENIMIENTO I&C PROYECTO A", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "equipamiento operativo subgerencia mantenimiento I&C", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0013-CSAAN-0018-2026", "descricao": "PARTES DE REPUESTO PARA LAS BOMBAS DE CIRCUITO CERRADO DE AGUA DE ENFRIAMIENTO DE LA TURBINA (P43/TCCW)", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "repuestos bombas circuito água enfriamiento turbina", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0027-CSSAN-0003-2026", "descricao": "Servicio de jardinería, control de plagas y revisión del sistema de riego de las instalaciones de la Residencia General de Construcción I, Querétaro", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Querétaro", "justificativa": "jardinería control pragas sistema riego Querétaro", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0050-CSCON-0002-2026", "descricao": "“Mantenimiento a camino de acceso al CGLH”", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "mantenimiento camino acceso CGLH", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0050-CSSAN-0011-2026", "descricao": "MONITOREO DE AGUA PARA CUMPLIMIENTO DE LAS OBLIGACIONES DE LOS TÍTULOS DE CONCESIÓN DEL CAMPO GEOTÉRMICO LOS HUMEROS, PUEBLA", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "monitoreo água títulos concesão geotérmico Humeros", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0053-CSSAN-0001-2026", "descricao": "SERVICIO DE MUESTREO Y ANÁLISIS DE AGUA EN EL CAMPO GEOTÉRMICO DE LAS TRES VÍRGENES", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California Sur", "justificativa": "muestreo análisis água geotérmico Tres Vírgenes", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0054-CSAAN-0009-2026", "descricao": "Refacciones y materiales relacionados para sistema de operación de pozos (Válvulas de bola y mariposa, para el campo Geotérmico de Los Azufres)", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "válvulas para campo geotérmico Los Azufres", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0100-ADSAN-0004-2026", "descricao": "D117 Servicio de Vigilancia División Bajío Mes de abril 2026", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "servicio vigilancia División Bajío abril", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0100-CASAN-0098-2026", "descricao": "D413 SERVICIO DE VIGILANCIA Y SEGURIDAD PARA LAS INSTALACIONES DE LA DVMC DE LA SUBDIRECCIÓN DE DISTRIBUCIÓN 2026", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "vigilancia segurança instalações subdirección distribución", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0100-CASAN-0102-2026", "descricao": "AD-CYC-018-26 600545816 Mantenimiento Preventivo y Correctivo Diesel MONCLOVA PARTIDA DESIERTA", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "mantenimiento preventivo correctivo diesel Monclova", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0102-CSSAN-0021-2026", "descricao": "“Servicio de Mantenimiento al Parque Vehicular Región Norte División Bajío 2026, Partidas Desiertas \"", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Guanajuato", "justificativa": "mantenimiento parque vehicular região Norte", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0103-ADSAN-0004-2026", "descricao": "SERVICIO DE VIGILANCIA PARA LAS OFICINAS DIVISIONALES Y SUS CENTROS DE TRABAJO DE LA SUBGERENCIA COMERCIAL PENINSULAR", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "vigilancia oficinas divisionales subgerencia comercial Peninsular", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0103-ADSAN-0005-2026", "descricao": "SERVICIO DE VIGILANCIA EN OFICINAS DIVISIONALES Y LAS 9 ZONAS DE LA DIVISIÓN PENINSULAR", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "vigilancia oficinas divisionales zonas División Peninsular", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0103-CACON-0037-2026", "descricao": "Reparación de muretes y registros eléctricos deteriorados en el Ámbito de la Zona Cancún 2026", "area": "Obras/Civil", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "reparação muretes registros eléctricos Cancún", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0105-CACON-0049-2026", "descricao": "Reemplazo de torre arriostrada, Oficinas Distribución Zona Matehuala", "area": "Transmissão", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Tamaulipas", "justificativa": "reemplazo torre arriostrada oficinas distribución Matehuala", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0105-CACON-0050-2026", "descricao": "Construcción y recalibración de 10 mejoras de Distribución en media y baja tensión de 13.8 y 34.5 kV en el año 2026 en el ámbito geográfico de la Zona Rioverde", "area": "Distribuição", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Tamaulipas", "justificativa": "construcción recalibração mejoras distribución média tensão", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0106-ADSAN-0006-2026", "descricao": "D137 Limpieza a inmuebles", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Puebla", "justificativa": "limpeza inmuebles serviços gerais", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0106-CSSAN-0022-2026", "descricao": "D137 Diplomado Gestión de Alto Impacto II", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Puebla", "justificativa": "diplomado gestión alto impacto capacitação", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0107-CSSAN-0014-2026", "descricao": "Servicio de Suministro de gasolina 87 octanos para vehículos sede Divisional y Zonas Comercial ", "area": "Serviços Gerais", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "México", "justificativa": "suministro gasolina 87 octanos vehículos", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0108-CACON-0014-2026", "descricao": "\"MEJORA INTEGRAL DE 9.87 KM DE LÍNEA DE MEDIA TENSIÓN EN EL MUNICIPIO DE ALVARADO, ZONA DE DISTRIBUCIÓN VERACRUZ\" ", "area": "Distribuição", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "mejora integral línea média tensão Alvarado", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0108-CACON-0015-2026", "descricao": "CONSTRUCCIÓN DE OBRA CIVIL Y ELECTROMECÁNICA PARA LA SUSTITUCIÓN DE CABLE DE POTENCIA EN EL CIRCUITO VRU-04095 \"LAS VEGAS\"", "area": "Distribuição", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "construcción substituição cabo potência circuito Vegas", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0109-CSAAN-0023-2026", "descricao": "ADQUISICIÓN DE SELLOS (PARTIDA DESIERTA)", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "adquisição sellos partida desierta", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0110-CSSAN-0083-2026", "descricao": "DCO-UPN-06-2026 SERVICIO DE MANTENIMIENTO MENOR DE EDIFICIOS PARA ZONA URUAPAN 2026", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "mantenimiento menor edificios zona Uruapan", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0110-CSSAN-0084-2026", "descricao": "DCO-APA-007-2026 SERVICIO DE ALIMENTOS ZONA APATZINGAN ", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "servicio alimentos zona Apatzingán", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0111-CACON-0016-2026", "descricao": "OBRAS PARA LA REDUCCION DE PERDIDAS TECNICAS 2026, ZONA OBREGON", "area": "Distribuição", "tipo": "Obra Civil", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "obras redução perdas técnicas zona Obregón", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0111-CSSAN-0010-2026", "descricao": "Servicio de calibración y mantenimiento menor a laboratorio de pruebas equipo LV", "area": "TI/Sistemas", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "calibração mantenimiento laboratorio pruebas equipo", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0113-CSSAN-0070-2026", "descricao": "D053 MANTENIMIENTO CORRECTIVO A EQUIPOS DE RADIOCOMUNICACIÓN DE DATOS DE LA DIVISIÓN DE DISTRIBUCIÓN NORTE", "area": "TI/Sistemas", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "mantenimiento correctivo equipos radiocomunicação datos", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0113-CSSAN-0073-2026", "descricao": "D061-SERVICIO DE RECOLECCION DE RAMAS ZONA DURANGO 2026", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "recolección ramas zona Durango", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0113-CSSAN-0074-2026", "descricao": "D062 - SERVICIO DE MANTENIMIENTO A SISTEMAS DE REFRIGERACION DE EDIFICIOS Y SUBESTACIONES ZONA GOMEZ PALACIO", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "mantenimiento sistemas refrigeração edificios subestações", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0113-CSSAN-0075-2026", "descricao": "D054-SERVICIO DE MANTENIMIENTO A EQUIPOS DE REFRIGERACIÓN 2026", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "mantenimiento equipos refrigeração", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0113-CSSAN-0076-2026", "descricao": "D054- SERVICIO DE MONITOREO DE ALARMAS 2026", "area": "TI/Sistemas", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "monitoreo alarmas sistemas comunicação", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0116-CSAAN-0003-2026", "descricao": "DJ-015-26 ARO DE SEGURIDAD PARA PERNO RECEPTACULO", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Jalisco", "justificativa": "aro segurança perno receptáculo", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0202-ADAAA-0001-2026", "descricao": "“ADQUISICION DE BOQUILLAS PARA TERCIARIO”", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "adquisición boquillas para terciário", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0204-CSAAA-0001-2026", "descricao": "ADQUISICIÓN Y PUESTA EN SERVICIO DE UNIDADES CONDENSADORAS", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "unidades condensadoras equipamento geração", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0208-CSCON-0003-2026", "descricao": "MANTENIMIENTO A LOCALES DE CUADRILLAS PERTENECIENTES A LA ZONA DE TRANSMISIÓN MALPASO", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "mantenimiento locales cuadrillas transmisión Malpaso", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0210-CSSAN-0007-2026", "descricao": "AGUA POTABLE EN PIPAS ZTVMS 2026", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "agua potable pipas ZTVMS", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0400-CSAAA-0018-2026", "descricao": "Adquisición de servoválvulas para el distribuidor de la Unidad 5 de la C.H. Infiernillo", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "servoválvulas distribuidor unidad hidroelétrica Infiernillo", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0400-CSCON-0007-2026", "descricao": "DESAZOLVE DE OBRA DE TOMA DE LA C.H. GRAL. AMBROSIO FIGUEROA (LA VENTA)", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "desazolve obra toma central hidroelétrica", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0400-CSSAN-0036-2026", "descricao": "SERVICIO DE CONTROL DE ACCESO Y VIGILANCIA EN  INSTALACIONES DE LA C.H. PORTEZUELO I, II Y TEPAZOLCO", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "control acceso vigilancia hidroelétricas Portezuelo Tepazolco", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0400-CSSAN-0037-2026", "descricao": "Servicio para el restablecimiento del sistema contraincendio del generador de la unidad 4 y disposición de banco de cilindros de reserva de la C.H. La Villita", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Ciudad de México", "justificativa": "restablecimiento sistema contraincendio hidroelétrica Villita", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0505-CSCON-0009-2026", "descricao": "MANTENIMIENTO RUTINARIO DE LAS INSTALACIONES DE LA CENTRAL HIDROELÉCTRICA JUMATÁN, 2DA. VUELTA.", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nayarit", "justificativa": "mantenimiento rutinario hidroelétrica Jumatán", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0506-CSAAA-0010-2026", "descricao": "SUMINISTRO, SUPERVISIÓN Y PUESTA EN SERVICIO DE SELLO TIPO RADIAL PARA LA UNIDAD 2 DE LA C.H. EL CÓBANO.", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Michoacán de Ocampo", "justificativa": "sello radial unidad hidroelétrica Cóbano", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0603-CSSAN-0017-2026", "descricao": "“Servicio de limpieza de maleza y servicio de podado de árboles y jardinería en casas de visita, casino social, campamento y dentro de la C.T. Puerto Libertad”", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Sonora", "justificativa": "limpeza maleza podado árboles termoelétrica Puerto", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0604-CSCON-0006-2026", "descricao": "MANTENIMIENTO A TORRES DE VIGILANCIA,DESTACAMENTO DE MARINA Y SEGURIDAD FÍSICA DE LA C.C.C. PRESIDENTE JUÁREZ-TERCER EVENTO", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California", "justificativa": "mantenimiento torres vigilancia segurança Presidente Juárez", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0604-CSSAN-0010-2026", "descricao": "SERVICIO DE MONITOREO DE EMISIONES DE GASES A LA ATMÓSFERA EN CHIMENEAS DE FUENTES FIJAS, RUIDO PERIMETRAL, MEDICIÓN DE ILUMINACIÓN Y ANÁLISIS CRETI DE LA CENTRAL TERMOELÉCTRICA PRESIDENTE JUÁREZ", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California", "justificativa": "monitoreo emisiones gases termoelétrica Presidente Juárez", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0611-CSAAA-0016-2026", "descricao": "Adquisición de Refacciones Mecánicas para los Mantenimientos Semestrales de las Unidades 3, 4, 5 y 17 de la C.C.I. Santa Rosalía", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California Sur", "justificativa": "refacciones mecánicas mantenimientos central Santa Rosalía", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0615-CSSAN-0005-2026", "descricao": "Rehabilitación de enfriadores de aire de barrido y servicio de limpieza a enfriadores y toberas fijas de turbocargadores de las unidades 1, 2 y 3 de la C.C.I. Gral. Agustín Olachea avilés 2026", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Baja California Sur", "justificativa": "rehabilitação enfriadores aire turbocargadores central Olachea", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0700-CSAAA-0014-2026", "descricao": "(HT60) Adquisición de filtros de alta eficiencia para los sistemas de filtración y purificación de aceites con destino para la Central Termoeléctrica Altamira", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "filtros alta eficiência sistemas filtração termoelétrica", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0700-CSAAN-0023-2026", "descricao": "(HT60) Adquisición de materiales para el control ambiental de la Central Termoeléctrica Altamira", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "materiales control ambiental termoelétrica Altamira", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0700-CSAAN-0026-2026", "descricao": "(HT65) Adquisición de Ropa de Trabajo, Calzado y Chamarra para el Personal de la Central Termoeléctrica Guadalupe Victoria", "area": "Serviços Gerais", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "ropa trabalho calzado personal termoelétrica", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0700-CSSAN-0040-2026", "descricao": "(HB60) SERVICIO DE LEVANTAMIENTO TOPOGRÁFICO DE COORDENADAS TRIDIMENSIONALES Y DETERMINACIÓN DE PESO VOLUMÉTRICO DE LAS PILAS DE CARBÓN ALMACENADO EN PATIOS PARA  LA C.T. JOSÉ LÓPEZ PORTILLO", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Nuevo León", "justificativa": "levantamiento topográfico pilas carbón termoelétrica López", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0912-CSSAN-0009-2026", "descricao": "600547572 - ELABORACIÓN DE EXPEDIENTES TÉCNICOS Y SERVICIO DE DIAGNÓSTICO DE LOS RSP, PARA OBTENCIÓN DE DICTAMEN DE FUNCIONAMIENTO CONFORME A LA NOM-020-STPS-2011 DE LA CG-HUMEROS", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "diagnóstico RSP NOM-020 central geotérmica Humeros", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0918-CSAAN-0014-2026", "descricao": "500665642 PRODUCTO QUÍMICO PARA TRATAMIENTO EXTERNO DE LA CENTRAL TERMOELÉCTRICA PRESIDENTE ADOLFO LÓPEZ MATEOS", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "produto químico para tratamento de central termoelétrica", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0920-CSAAA-0015-2026", "descricao": "500665949 ADQUISICIÓN DE POSICIONADORES AUTOCALIBRABLES Y TRANSDUCTORES IPs PARA VÁLVULAS DE CONTROL DE LOS DIFERENTES SISTEMAS DEL GENERADOR DE VAPOR DE LAS UNIDADES DE LA CENTRAL TERMOELÉCTRICA MÉRI", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "posicionadores válvulas control generador vapor Mérida", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0920-CSAAA-0016-2026", "descricao": "5100005340 ADQUISICION DE BANCO DE BATERIAS DE 60 CELDAS, CARGADOR DE BATERIAS Y PUESTA EN SERVICIO PARA LA UNIDAD 2 DE LA CENTRAL TERMOELECTRICA MERIDA II", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "banco baterías cargador termoelétrica Mérida II", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0920-CSCON-0017-2026", "descricao": "700218503  MANTENIMIENTO INTEGRAL A LA INFRAESTRUCTURA DE LOS DIQUES DE DIESEL DE LA CENTRAL TURBOGAS CANCUN-NIZUC", "area": "Obras/Civil", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Yucatán", "justificativa": "mantenimiento integral infraestrutura diques diesel Cancún", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0922-CSAAA-0003-2026", "descricao": "510000533 ADQUISICIÓN, MONTAJE Y PUESTA EN SERVICIO DE BANCOS DE BATERÍAS PARA SISTEMAS DE 250 VCD DE LA CENTRAL HIDROELÉCTRICA TEMASCAL", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "bancos baterias sistemas 250 VCD hidroelétrica", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0929-CSSAN-0008-2026", "descricao": "600547818  SERVICIO DE MANTENIMIENTO A EQUIPOS DE AIRE ACONDICIONADO DE PROCESO DE LA CENTRAL CICLO COMBINADO POZA RICA", "area": "Geração", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Veracruz de Ignacio de la Llave", "justificativa": "mantenimiento equipos aire acondicionado Poza Rica", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0930-CSAAA-0007-2026", "descricao": "500665667.- \"ADQUISICION DE CONECTORES DE EXTRA ALTO VOLTAJE PARA LA C.H. BELISARIO DOMINGUEZ\"", "area": "Geração", "tipo": "Material/Insumo", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "conectores extra alto voltaje hidroelétrica Belisario", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0930-CSAAA-0008-2026", "descricao": "500665661.- \"ADQUISICION DE MEDIDORES DE ENERGIA MULTIFUNCION PARA FACTURACION DE LAS UNIDADES 1,3 Y 5 DE LA C.H. BELISARIO DOMINGUEZ\"", "area": "Geração", "tipo": "Equipamento", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "medidores energia multifunção facturação hidroelétrica", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0930-CSSAN-0018-2026", "descricao": "600547635- MANTENIMIENTO PREVENTIVO Y CORRECTIVO A LOS EQUIPOS DE AIRE ACONDICIONADO DE OFICINAS SEDE Y DEPARTAMENTO REGIONAL DE HIDROMETRÍA DE LA SUBGERENCIA DE PRODUCCIÓN HIDROELÉCTRICA GRIJALVA, AÑ", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "mantenimiento aire acondicionado oficinas hidrometría Grijalva", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-07", "origem": "CFE", "numero": "CFE-0930-CSSAN-0019-2026", "descricao": "600547520- SERVICIO DE TRANSPORTE DE PERSONAL DEL MUNICIPIO DE TUXTLA GUTIÉRREZ A LA CENTRAL HIDROELÉCTRICA MANUEL MORENO TORRES, EN EL ESTADO DE CHIAPAS, AÑO 2026.", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "transporte personal hidroelétrica Manuel Moreno Torres", "atualizado": "08/04/2026 20:37", "campos_alterados": ""}, {"status": "✅ Sem mudança", "data": "2026-04-08", "origem": "CFE", "numero": "CFE-0930-CSSAN-0020-2026", "descricao": "600547427- SERVICIO DE TRANSPORTE DE PERSONAL DE LA CIUDAD DE TAPACHULA DE CÓRDOVA Y ORDOÑEZ A LA CENTRAL HIDROELÉCTRICA JOSÉ CECILIO DEL VALLE, EN EL ESTADO DE CHIAPAS, AÑO 2026.", "area": "Serviços Gerais", "tipo": "Serviço", "tipo_proc": "", "contrato": "", "estado": "Vigente", "prazo": "", "julgamento": "", "valor": "", "entidade": "Chiapas", "justificativa": "transporte personal hidroelétrica José Cecilio Valle", "atualizado": "09/04/2026 15:44", "campos_alterados": ""}];
+const AREAS_CORES    = {"Nuclear": "#C62828", "Geração": "#E65100", "Transmissão": "#1565C0", "Distribuição": "#2E7D32", "TI/Sistemas": "#6A1B9A", "Obras/Civil": "#4E342E", "Serviços Gerais": "#546E7A", "Outro": "#757575"};
+const AREAS_LISTA    = ["Nuclear", "Geração", "Transmissão", "Distribuição", "TI/Sistemas", "Obras/Civil", "Serviços Gerais", "Outro"];
+const POR_PAG        = 25;
+
+let dadosFiltrados = [];
+let paginaAtual    = 1;
+let sortCol        = 'data';
+let sortAsc        = false;
+
+// Seleções multi-select
+const sel = { area: new Set(), tipo: new Set(), status: new Set(), mes: new Set() };
+
+// ── Init ────────────────────────────────────────────────────
+window.onload = () => {
+  construirMultiSelects();
+  document.getElementById('f-data-ini').addEventListener('change', () => { paginaAtual=1; aplicarFiltros(); });
+  document.getElementById('f-data-fim').addEventListener('change', () => { paginaAtual=1; aplicarFiltros(); });
+  document.getElementById('f-busca').addEventListener('input',  () => { paginaAtual=1; aplicarFiltros(); });
+  // Fecha dropdowns ao clicar fora
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ms-wrap')) fecharTodos();
+  });
+  aplicarFiltros();
+};
+
+// ── Multi-select ─────────────────────────────────────────────
+function construirMultiSelects() {
+  const areas   = [...new Set(DADOS_RAW.map(d=>d.area).filter(Boolean))].sort();
+  const tipos   = [...new Set(DADOS_RAW.map(d=>d.tipo).filter(Boolean))].sort();
+  const statuses= ['🆕 Novo','🔄 Atualizado','✅ Sem mudança'];
+  const meses   = [...new Set(DADOS_RAW.map(d=>d.data.substring(0,7)).filter(Boolean))].sort().reverse();
+  const mesesLabel = meses.map(m => {
+    const [y,mo]=m.split('-');
+    const nome=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1];
+    return `${nome}/${y}`;
+  });
+
+  criarMS('ms-area',   'ms-area-dd',   'ms-area-label',   areas,   'area',   null);
+  criarMS('ms-tipo',   'ms-tipo-dd',   'ms-tipo-label',   tipos,   'tipo',   null);
+  criarMS('ms-status', 'ms-status-dd', 'ms-status-label', statuses,'status', null);
+  criarMSComValores('ms-mes', 'ms-mes-dd', 'ms-mes-label', meses, mesesLabel, 'mes');
+}
+
+function criarMSComValores(wrapId, ddId, labelId, valores, labels, selKey) {
+  const dd = document.getElementById(ddId);
+  valores.forEach((val, idx) => {
+    const item = document.createElement('div');
+    item.className = 'ms-item';
+    item.innerHTML = `<input type="checkbox" value="${val}" onchange="toggleSel('${selKey}','${val}','${labelId}')">${labels[idx]}`;
+    dd.appendChild(item);
+  });
+  const clr = document.createElement('div');
+  clr.className='ms-clear'; clr.textContent='Limpar seleção';
+  clr.onclick = () => limparMS(selKey, labelId, ddId);
+  dd.appendChild(clr);
+}
+
+function criarMS(wrapId, ddId, labelId, opcoes, selKey, cores) {
+  const dd = document.getElementById(ddId);
+  opcoes.forEach(op => {
+    const item = document.createElement('div');
+    item.className = 'ms-item';
+    const cor = cores ? (cores[op] || '#757575') : null;
+    item.innerHTML = `
+      <input type="checkbox" value="${op}" onchange="toggleSel('${selKey}','${op}','${labelId}')">
+      ${cor ? `<span class="dot" style="background:${cor}"></span>` : ''}
+      <span>${op}</span>`;
+    dd.appendChild(item);
+  });
+  const clr = document.createElement('div');
+  clr.className='ms-clear'; clr.textContent='Limpar seleção';
+  clr.onclick = () => limparMS(selKey, labelId, ddId);
+  dd.appendChild(clr);
+}
+
+function toggleSel(key, val, labelId) {
+  if (sel[key].has(val)) sel[key].delete(val); else sel[key].add(val);
+  atualizarLabel(key, labelId);
+  paginaAtual=1; aplicarFiltros();
+}
+
+function atualizarLabel(key, labelId) {
+  const s = sel[key];
+  const defaults = { area:'Todas as áreas', tipo:'Todos os tipos', status:'Todos', mes:'Todos' };
+  document.getElementById(labelId).textContent =
+    s.size === 0 ? defaults[key] :
+    s.size === 1 ? [...s][0] :
+    `${s.size} selecionados`;
+}
+
+function limparMS(key, labelId, ddId) {
+  sel[key].clear();
+  document.querySelectorAll(`#${ddId} input[type=checkbox]`).forEach(cb => cb.checked=false);
+  atualizarLabel(key, labelId);
+  paginaAtual=1; aplicarFiltros();
+}
+
+function toggleDropdown(wrapId) {
+  const dd = document.getElementById(wrapId+'-dd');
+  const wasOpen = dd.classList.contains('open');
+  fecharTodos();
+  if (!wasOpen) dd.classList.add('open');
+}
+
+function fecharTodos() {
+  document.querySelectorAll('.ms-dropdown').forEach(d => d.classList.remove('open'));
+}
+
+// ── Filtros ──────────────────────────────────────────────────
+function resetarFiltros() {
+  ['area','tipo','status','mes'].forEach(k => {
+    sel[k].clear();
+    const ddId = `ms-${k}-dd`;
+    document.querySelectorAll(`#${ddId} input[type=checkbox]`).forEach(cb=>cb.checked=false);
+    atualizarLabel(k, `ms-${k}-label`);
+  });
+  document.getElementById('f-data-ini').value='';
+  document.getElementById('f-data-fim').value='';
+  document.getElementById('f-busca').value='';
+  paginaAtual=1; aplicarFiltros();
+}
+
+function aplicarFiltros() {
+  const dIni  = document.getElementById('f-data-ini').value;
+  const dFim  = document.getElementById('f-data-fim').value;
+  const busca = document.getElementById('f-busca').value.toLowerCase();
+
+  dadosFiltrados = DADOS_RAW.filter(d => {
+    if (sel.area.size   && !sel.area.has(d.area))              return false;
+    if (sel.tipo.size   && !sel.tipo.has(d.tipo))              return false;
+    if (sel.status.size && !sel.status.has(d.status))          return false;
+    if (sel.mes.size    && !sel.mes.has(d.data.substring(0,7))) return false;
+    if (dIni && d.data < dIni) return false;
+    if (dFim && d.data > dFim) return false;
+    if (busca && !d.numero.toLowerCase().includes(busca) && !d.descricao.toLowerCase().includes(busca)) return false;
+    return true;
+  });
+
+  dadosFiltrados.sort((a,b) => {
+    let va=a[sortCol]||'', vb=b[sortCol]||'';
+    return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+
+  atualizarKPIs();
+  atualizarGraficos();
+  renderTabela();
+}
+
+function st(col) { if(sortCol===col) sortAsc=!sortAsc; else {sortCol=col;sortAsc=true;} aplicarFiltros(); }
+
+// ── KPIs ────────────────────────────────────────────────────
+function atualizarKPIs() {
+  const total  = dadosFiltrados.length;
+  const datas  = new Set(dadosFiltrados.map(d=>d.data).filter(Boolean));
+  const dias   = datas.size;
+  const media  = dias>0 ? (total/dias).toFixed(1) : '—';
+  const nuc    = dadosFiltrados.filter(d=>d.area==='Nuclear').length;
+  const novos  = dadosFiltrados.filter(d=>d.status.includes('Novo')).length;
+  document.getElementById('kpi-total').textContent    = total.toLocaleString();
+  document.getElementById('kpi-sub-total').textContent= `${novos} novos nesta atualização`;
+  document.getElementById('kpi-dias').textContent     = dias;
+  document.getElementById('kpi-sub-dias').textContent = dias>0 ? `${[...datas].sort()[0]} → ${[...datas].sort().slice(-1)[0]}` : '';
+  document.getElementById('kpi-media').textContent    = media;
+  document.getElementById('kpi-nuclear').textContent  = nuc;
+  document.getElementById('header-sub').textContent   = `${total} licitações | ${dias} dia(s)`;
+}
+
+// ── Gráficos ────────────────────────────────────────────────
+let chartDias=null, chartAreas=null;
+
+function atualizarGraficos() {
+  const datas = [...new Set(dadosFiltrados.map(d=>d.data).filter(Boolean))].sort();
+  const countPorDia = {};
+  dadosFiltrados.forEach(d => {
+    if(!d.data) return;
+    if(!countPorDia[d.data]) countPorDia[d.data]={};
+    countPorDia[d.data][d.area] = (countPorDia[d.data][d.area]||0)+1;
+  });
+
+  const datasets = AREAS_LISTA
+    .map(area => ({
+      label: area,
+      data:  datas.map(d=>(countPorDia[d]||{})[area]||0),
+      backgroundColor: AREAS_CORES[area],
+      borderColor:     AREAS_CORES[area],
+      borderWidth: 0,
+    }))
+    .filter(ds => ds.data.some(v=>v>0));
+
+  if(chartDias) chartDias.destroy();
+  chartDias = new Chart(document.getElementById('chart-dias'), {
+    type:'bar',
+    data:{ labels: datas.map(d => formatDataCompleta(d)), datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'bottom', labels:{ color:'#94a3b8', boxWidth:12, font:{size:10} } },
+        tooltip:{ mode:'index', intersect:false }
+      },
+      scales:{
+        x:{ stacked:true, ticks:{ color:'#94a3b8', maxRotation:45, font:{size:10} }, grid:{ color:'#1e293b' } },
+        y:{ stacked:true, ticks:{ color:'#94a3b8', stepSize:1 },               grid:{ color:'#263548' } },
+      }
+    }
+  });
+
+  const cntArea={};
+  dadosFiltrados.forEach(d => cntArea[d.area]=(cntArea[d.area]||0)+1);
+  const areasComDados = Object.entries(cntArea).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+  if(chartAreas) chartAreas.destroy();
+  chartAreas = new Chart(document.getElementById('chart-areas'), {
+    type:'doughnut',
+    data:{
+      labels: areasComDados.map(([a])=>a),
+      datasets:[{
+        data: areasComDados.map(([,v])=>v),
+        backgroundColor: areasComDados.map(([a])=>AREAS_CORES[a]||'#757575'),
+        borderWidth:2, borderColor:'#1e293b',
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'right', labels:{ color:'#94a3b8', boxWidth:12, font:{size:10} } },
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.label}: ${ctx.raw} (${(ctx.raw/dadosFiltrados.length*100).toFixed(1)}%)` } }
+      }
+    }
+  });
+}
+
+// ── Formatação de datas ──────────────────────────────────────
+function formatDataCompleta(d) {
+  if(!d) return '';
+  const [y,m,dia] = d.split('-');
+  return `${dia}/${m}/${y}`;   // dd/mm/aaaa
+}
+
+function formatDataCurta(d) {
+  if(!d) return '';
+  const [y,m,dia] = d.split('-');
+  return `${dia}/${m}/${y.slice(2)}`;  // dd/mm/aa
+}
+
+// ── Tabela ───────────────────────────────────────────────────
+function renderTabela() {
+  const ini=(paginaAtual-1)*POR_PAG, fim=ini+POR_PAG;
+  const pagina=dadosFiltrados.slice(ini,fim);
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+
+  pagina.forEach(d => {
+    const tr=document.createElement('tr');
+    if(d.area==='Nuclear') tr.className='nuclear-row';
+    const areaCor  = AREAS_CORES[d.area]||'#757575';
+    const stBadge  = d.status.includes('Novo')?'badge-novo':(d.status.includes('Atualiz')?'badge-atualizado':'badge-sem');
+    const prazoC   = isPrazoUrgente(d.prazo)?'prazo-urgente':'prazo-normal';
+    const stLabel  = d.status.replace('🆕 ','').replace('🔄 ','').replace('✅ ','');
+    tr.innerHTML=`
+      <td><span class="badge ${stBadge}">${stLabel}</span></td>
+      <td style="white-space:nowrap">${formatDataCompleta(d.data)}</td>
+      <td style="font-family:monospace;font-size:.76rem;white-space:nowrap">${d.numero}</td>
+      <td style="min-width:180px;max-width:280px">${d.descricao}</td>
+      <td><span class="area-badge" style="background:${areaCor}">${d.area}</span></td>
+      <td style="font-size:.76rem">${d.tipo}</td>
+      <td class="${prazoC}" style="white-space:nowrap">${formatDataCompleta(d.prazo)}</td>
+      <td style="font-size:.76rem;opacity:.8;white-space:nowrap">${formatDataCompleta(d.julgamento)}</td>
+      <td style="font-size:.76rem;opacity:.65">${d.estado}</td>
+      <td style="font-size:.73rem;color:#fb923c;font-style:italic">${d.campos_alterados||''}</td>
+      <td style="font-size:.73rem;opacity:.65;min-width:150px">${d.justificativa}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const total=dadosFiltrados.length, totalPags=Math.ceil(total/POR_PAG);
+  document.getElementById('table-info').textContent=`Mostrando ${ini+1}–${Math.min(fim,total)} de ${total} registros`;
+  const btns=document.getElementById('pag-btns');
+  btns.innerHTML='';
+  document.getElementById('pag-info').textContent=`Página ${paginaAtual} de ${totalPags}`;
+  const addBtn=(label,pg,active=false)=>{
+    const b=document.createElement('button');
+    b.textContent=label; if(active) b.className='active';
+    b.onclick=()=>{paginaAtual=pg;renderTabela()};
+    btns.appendChild(b);
+  };
+  if(paginaAtual>1) addBtn('‹',paginaAtual-1);
+  const s=Math.max(1,paginaAtual-2), e=Math.min(totalPags,paginaAtual+2);
+  for(let p=s;p<=e;p++) addBtn(p,p,p===paginaAtual);
+  if(paginaAtual<totalPags) addBtn('›',paginaAtual+1);
+}
+
+function isPrazoUrgente(prazo) {
+  if(!prazo) return false;
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const diff=(new Date(prazo)-hoje)/(86400000);
+  return diff>=0 && diff<=7;
+}
+</script>
+</body>
+</html>
