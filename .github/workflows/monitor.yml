@@ -2,7 +2,6 @@ name: CFE Monitor — Execução Automática
 
 on:
   schedule:
-    # 11:00 e 17:00 UTC = 08:00 e 14:00 BRT (UTC-3)
     - cron: "0 11 * * *"
     - cron: "0 17 * * *"
   workflow_dispatch:
@@ -51,8 +50,6 @@ jobs:
       - name: Executar CFE Monitor
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # GITHUB_TOKEN do script é DESLIGADO aqui de propósito —
-          # a publicação do HTML é feita via git push abaixo, evitando duplicação.
           GITHUB_TOKEN: ""
           LOG_LEVEL: INFO
         run: |
@@ -82,37 +79,39 @@ jobs:
             exit 0
           fi
           python <<'PY'
-          import json, os, subprocess
+          import json, subprocess
           status = json.load(open("status_fontes.json"))
           falhas = status.get("falhas_consecutivas", {})
           alertar = [f for f, n in falhas.items() if n >= 3]
           if not alertar:
               print("Nenhuma fonte com 3+ falhas consecutivas.")
-              exit(0)
+              raise SystemExit(0)
           titulo = f"[Monitor] Fonte(s) zerada(s): {', '.join(alertar)}"
           corpo = (
               "As seguintes fontes retornaram **0 procedimentos** em 3 ou mais execuções consecutivas:\n\n"
-              + "\n".join(f"- `{f}` — {falhas[f]} falhas consecutivas" for f in alertar)
-              + "\n\nProvável causa: scraper quebrado por mudança no site de origem. Verifique o log do run."
+              + "\n".join(f"- `{f}` - {falhas[f]} falhas consecutivas" for f in alertar)
+              + "\n\nProvavel causa: scraper quebrado por mudanca no site de origem. Verifique o log do run."
           )
-          # Evita issues duplicadas: só abre se não houver issue aberta com mesmo título
           existe = subprocess.run(
               ["gh","issue","list","--state","open","--search",titulo,"--json","title"],
               capture_output=True, text=True, check=True
           ).stdout
           if titulo in existe:
-              print("Issue já existe — não duplicando.")
+              print("Issue ja existe - nao duplicando.")
           else:
               subprocess.run(["gh","issue","create","--title",titulo,"--body",corpo,"--label","scraper-broken"], check=True)
           PY
 
-      - name: Commit dos resultados (Excel + HTML + index.html)
+      - name: Commit dos resultados
         if: success()
         run: |
-          # Pages serve a partir de index.html — mantemos a URL existente
           if [ -f CFE_Dashboard.html ]; then cp CFE_Dashboard.html index.html; fi
           git config user.name  "cfe-monitor-bot"
           git config user.email "cfe-monitor-bot@users.noreply.github.com"
           git add CFE_Monitor_Consolidado.xlsx CFE_Dashboard.html index.html status_fontes.json 2>/dev/null || true
           if git diff --cached --quiet; then
-            
+            echo "Nenhuma mudanca para commitar."
+          else
+            git commit -m "chore: atualizacao automatica $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
