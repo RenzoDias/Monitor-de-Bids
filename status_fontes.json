@@ -1,0 +1,27 @@
+{
+  "ultima_execucao_utc": "2026-04-28T23:56:03+00:00",
+  "periodo": {
+    "ini": "2026-04-26",
+    "fim": "2026-04-28"
+  },
+  "contagens": {
+    "CFE": 78,
+    "ETN": 0,
+    "INB": 20,
+    "CDTN": 0,
+    "NASA": 171,
+    "Dioxitek": 8,
+    "CCHEN": 0,
+    "IAEA": 0
+  },
+  "falhas_consecutivas": {
+    "CFE": 0,
+    "ETN": 1,
+    "INB": 0,
+    "CDTN": 1,
+    "NASA": 0,
+    "Dioxitek": 0,
+    "CCHEN": 1,
+    "IAEA": 1
+  }
+}
