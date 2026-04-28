@@ -1,0 +1,27 @@
+# Segredos e configuração local
+.env
+.env.local
+*.env
+!.env.example
+
+# Logs de execução
+logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# NOTA:
+# CFE_Monitor_Consolidado.xlsx é commitado — é o estado persistente entre runs.
+# CFE_Dashboard.html é commitado — servido pelo GitHub Pages.
