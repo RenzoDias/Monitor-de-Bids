@@ -77,6 +77,21 @@ IAEA_URL    = "https://www.ungm.org/Public/Notice/Search"
 IAEA_CODIGO = 44       # IAEA agency code no UNGM
 IAEA_ORIGEM = "IAEA"
 
+# ── Lookback por fonte (em dias) ──────────────────────────────
+# Fontes esparsas precisam de janela mais ampla pra capturar bids.
+# Sem override (None) = usa ini/fim padrão da CLI/calcular_intervalo.
+# Bids já na base são deduplicados via procs_existentes (numero).
+LOOKBACK_DIAS_FONTE = {
+    "CFE":            None,   # alta volume — janela padrão
+    "Eletronuclear":  None,   # média volume — janela padrão
+    "INB":            None,   # média volume — janela padrão
+    "NASA":           None,   # alta volume — janela padrão
+    "Dioxitek":       None,   # média volume — janela padrão
+    "CDTN":           60,     # esparso — 60 dias
+    "CCHEN":          30,     # esparso — 30 dias
+    "IAEA":           30,     # esparso — 30 dias
+}
+
 # ── GitHub Pages ───────────────────────────────────────────────
 GITHUB_TOKEN  = os.getenv("GITHUB_TOKEN", "")
 GITHUB_USER   = "RenzoDias"
@@ -154,13 +169,16 @@ COLUNAS = [
     ("Justificativa",    40),  # 15
     ("Atualizado em",    16),  # 16
     ("Campos Alterados", 35),  # 17
-    ("Revisão",          16),  # 18  ← preenchimento manual
-    ("Observação",       50),  # 19  ← preenchimento manual
+    ("Revisão",          16),  # 18  ← vem de revisoes.csv
+    ("Observação",       50),  # 19  ← vem de revisoes.csv
+    ("Erro Class.",      14),  # 20  ← vem de revisoes.csv (🔴 Sim / 🟢 Não)
+    ("Área Correta",     20),  # 21  ← vem de revisoes.csv (preenchido se erro)
 ]
 COL_STATUS=1;COL_DATA=2;COL_ORIGEM=3;COL_NUM=4
 COL_AREA=6;COL_TIPO=7;COL_PRAZO=11
 COL_ATUALIZADO=16;COL_ALTERADOS=17
 COL_REVISAO=18;COL_OBSERVACAO=19
+COL_ERRO_CLAS=20;COL_AREA_CORRETA=21
 
 # Colunas ignoradas na comparação (mudam sempre, não indicam mudança real)
 COLUNAS_IGNORAR_COMPARACAO = {
@@ -169,12 +187,16 @@ COLUNAS_IGNORAR_COMPARACAO = {
     15,            # Justificativa — gerada pelo Claude
     16,            # Atualizado em — timestamp sempre novo
     17,            # Campos Alterados — calculado aqui
-    COL_REVISAO,   # Revisão — preenchimento manual, NUNCA sobrescrever
-    COL_OBSERVACAO,# Observação — preenchimento manual, NUNCA sobrescrever
+    COL_REVISAO,        # Revisão — vem de revisoes.csv
+    COL_OBSERVACAO,     # Observação — vem de revisoes.csv
+    COL_ERRO_CLAS,      # Erro Classificação — vem de revisoes.csv
+    COL_AREA_CORRETA,   # Área Correta — vem de revisoes.csv
 }
 
 # Opções de revisão (para referência)
 OPCOES_REVISAO = ["✔ Seguido", "✘ Não seguido", "👁 Em análise", "⏸ Aguardando"]
+OPCOES_ERRO_CLAS = ["🔴 Sim - área errada", "🟢 Não - classificação ok"]
+ARQUIVO_REVISOES = "revisoes.csv"
 
 # Nomes das colunas para exibir no campo "Campos Alterados"
 NOMES_COLUNAS = {i+1: nome for i,(nome,_) in enumerate(COLUNAS)}
@@ -1743,6 +1765,96 @@ def estilo_linha(ws,row_n,vals,cor_bg):
         elif nuclear: c.fill=PatternFill("solid",fgColor="FFEBEE"); c.font=Font(size=9,color="B71C1C")
         else: c.fill=PatternFill("solid",fgColor=cor_bg)
 
+def aplicar_revisoes_csv(arquivo_excel: str, arquivo_csv: str, registros: dict) -> dict:
+    """
+    Lê revisoes.csv e sobrescreve as colunas Revisão/Observação/Erro Class./Área Correta
+    no Excel e na estrutura registros (usada pelo dashboard).
+
+    Formato do CSV:
+        numero,revisao,observacao,erro_classificacao,area_correta
+
+    O CSV é a fonte de verdade para essas 4 colunas — sempre prevalece sobre o Excel.
+    Bids no CSV que não existem no Excel são ignorados (sem erro).
+    """
+    import csv as _csv
+    if not Path(arquivo_csv).exists():
+        logging.info("revisoes.csv não encontrado — nenhuma revisão a aplicar.")
+        return registros
+
+    # Lê CSV
+    revisoes = {}
+    with open(arquivo_csv, "r", encoding="utf-8", newline="") as f:
+        reader = _csv.DictReader(f)
+        for r in reader:
+            num = (r.get("numero") or "").strip()
+            if num:
+                revisoes[num] = {
+                    "revisao":            (r.get("revisao") or "").strip(),
+                    "observacao":         (r.get("observacao") or "").strip(),
+                    "erro_classificacao": (r.get("erro_classificacao") or "").strip(),
+                    "area_correta":       (r.get("area_correta") or "").strip(),
+                }
+    print(f"Aplicando {len(revisoes)} revisões do CSV...")
+    if not revisoes:
+        return registros
+
+    # Atualiza registros em memória
+    aplicadas = 0
+    for num, rev in revisoes.items():
+        if num in registros:
+            linha = list(registros[num])
+            # Garante tamanho mínimo (cols 18-21)
+            while len(linha) < COL_AREA_CORRETA:
+                linha.append("")
+            linha[COL_REVISAO-1]      = rev["revisao"]
+            linha[COL_OBSERVACAO-1]   = rev["observacao"]
+            linha[COL_ERRO_CLAS-1]    = rev["erro_classificacao"]
+            linha[COL_AREA_CORRETA-1] = rev["area_correta"]
+            registros[num] = linha
+            aplicadas += 1
+
+    # Sobrescreve as células no arquivo Excel
+    if not Path(arquivo_excel).exists():
+        logging.warning("Excel não existe — pulando atualização de células.")
+        return registros
+
+    wb = load_workbook(arquivo_excel)
+    if "Base Geral" not in wb.sheetnames:
+        return registros
+    ws = wb["Base Geral"]
+
+    # Mapeia número -> linha no Excel
+    linha_por_numero = {}
+    for row_idx in range(4, ws.max_row + 1):
+        cel = ws.cell(row=row_idx, column=COL_NUM).value
+        if cel:
+            linha_por_numero[str(cel).strip()] = row_idx
+
+    for num, rev in revisoes.items():
+        if num not in linha_por_numero:
+            continue
+        row_idx = linha_por_numero[num]
+        ws.cell(row=row_idx, column=COL_REVISAO).value      = rev["revisao"]
+        ws.cell(row=row_idx, column=COL_OBSERVACAO).value   = rev["observacao"]
+        ws.cell(row=row_idx, column=COL_ERRO_CLAS).value    = rev["erro_classificacao"]
+        ws.cell(row=row_idx, column=COL_AREA_CORRETA).value = rev["area_correta"]
+
+        # Estilo das novas colunas
+        if rev["erro_classificacao"]:
+            c = ws.cell(row=row_idx, column=COL_ERRO_CLAS)
+            if "Sim" in rev["erro_classificacao"]:
+                c.fill = PatternFill("solid", fgColor="B71C1C")
+                c.font = Font(bold=True, size=9, color="FFFFFF")
+            elif "Não" in rev["erro_classificacao"] or "Nao" in rev["erro_classificacao"]:
+                c.fill = PatternFill("solid", fgColor="1B5E20")
+                c.font = Font(bold=True, size=9, color="FFFFFF")
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    wb.save(arquivo_excel)
+    print(f"  ✓ {aplicadas} revisões aplicadas ao Excel.")
+    return registros
+
+
 def salvar_excel(arquivo,procs_novos=None):
     registros={}; ordem=[]
     if Path(arquivo).exists():
@@ -2592,6 +2704,21 @@ def carregar_base_existente(arquivo: str) -> dict:
     return existentes
 
 
+def _ini_para_fonte(fonte: str, ini_default: str, fim_default: str) -> str:
+    """
+    Retorna a data inicial efetiva para uma fonte.
+    Se a fonte tem lookback configurado, recua a partir de fim_default.
+    Caso contrário, retorna ini_default sem alteração.
+    """
+    lb = LOOKBACK_DIAS_FONTE.get(fonte)
+    if lb is None:
+        return ini_default
+    fim_d = date.fromisoformat(fim_default)
+    ini_lookback = (fim_d - timedelta(days=lb)).isoformat()
+    # Olha o mais para tras dos dois (lookback ou padrão)
+    return ini_lookback if ini_lookback < ini_default else ini_default
+
+
 def main():
     parser=argparse.ArgumentParser(description="CFE Monitor v5")
     parser.add_argument("--ini",    default=None)
@@ -2650,10 +2777,11 @@ def main():
         if "INB" in origens_ativas:
             procs_inb = buscar_inb(session, ini, fim)
 
-        # CDTN via Comprasnet
+        # CDTN via Comprasnet (lookback configurável)
         procs_cdtn = []
         if "CDTN" in origens_ativas:
-            procs_cdtn = buscar_cdtn(session, ini, fim)
+            ini_cdtn = _ini_para_fonte("CDTN", ini, fim)
+            procs_cdtn = buscar_cdtn(session, ini_cdtn, fim)
 
         # NASA — Nucleoeléctrica Argentina
         procs_nasa = []
@@ -2665,15 +2793,17 @@ def main():
         if "DIOXITEK" in origens_ativas:
             procs_dioxitek = buscar_dioxitek(session, ini, fim)
 
-        # CCHEN — Mercado Público Chile
+        # CCHEN — Mercado Público Chile (lookback configurável)
         procs_cchen = []
         if "CCHEN" in origens_ativas:
-            procs_cchen = buscar_cchen(session, ini, fim)
+            ini_cchen = _ini_para_fonte("CCHEN", ini, fim)
+            procs_cchen = buscar_cchen(session, ini_cchen, fim)
 
-        # IAEA — UNGM
+        # IAEA — UNGM (lookback configurável)
         procs_iaea = []
         if "IAEA" in origens_ativas:
-            procs_iaea = buscar_iaea(session, ini, fim)
+            ini_iaea = _ini_para_fonte("IAEA", ini, fim)
+            procs_iaea = buscar_iaea(session, ini_iaea, fim)
 
         procs = procs_cfe + procs_elet + procs_inb + procs_cdtn + procs_nasa + procs_dioxitek + procs_cchen + procs_iaea
 
@@ -2795,6 +2925,8 @@ def main():
 
         todos = procs_novos + procs_existentes + procs_base_extras
         registros,cont = salvar_excel(args.excel, todos)
+        # Aplica revisões manuais do CSV (Revisão/Observação/Erro Class./Área Correta)
+        registros = aplicar_revisoes_csv(args.excel, ARQUIVO_REVISOES, registros)
         gerar_html(registros, args.html)
         url_publica = publicar_github(args.html)
 

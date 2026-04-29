@@ -124,17 +124,69 @@ python cfe_monitor.py --origem CFE,INB
 
 ---
 
-## Próximos passos (roadmap)
+## Revisões manuais — `revisoes.csv` (novo)
 
-Esta versão completa a **semana 1** do plano de migração:
+As colunas **Revisão**, **Observação**, **Erro Class.** e **Área Correta** do Excel
+são populadas a partir de um arquivo `revisoes.csv` na raiz do repo. O bot carrega
+esse CSV em cada run e sobrescreve as 4 colunas para os bids correspondentes.
 
-- [x] Token GitHub fora do código
-- [x] Execução automática via GitHub Actions (cron 2x ao dia)
-- [x] Logging estruturado
-- [x] Detecção e alerta de scraper quebrado
+Vantagens:
 
-Próximas semanas (em planejamento):
+- O CSV é texto puro — você edita direto pelo navegador no GitHub (clica no lápis,
+  edita uma célula, commita), sem download/upload de Excel
+- Suas revisões nunca são sobrescritas pelo bot
+- A coluna `erro_classificacao` separa erro real do classificador de decisões
+  de negócio (vencido, fora de escopo, valor baixo). Isso será usado pelo
+  classificador na fase 3 para aprender com seus feedbacks
 
-- Semana 2 — modularização e benchmark de classificação
-- Semana 3 — duas passadas de classificação, few-shot a partir da coluna "Revisão", upgrade pro Sonnet 4.6 com extended thinking
-- Semana 4 — briefing semanal automático via Co
+### Como editar
+
+1. Abra <https://github.com/RenzoDias/Monitor-de-Bids/blob/main/revisoes.csv>
+2. Clique no ícone de lápis (Edit this file)
+3. Edite a célula desejada
+4. **Commit changes**
+
+### Estrutura do CSV
+
+| Coluna | Valores válidos |
+| --- | --- |
+| `numero` | número do processo (chave) |
+| `revisao` | `✔ Seguido` / `✘ Não seguido` / `👁 Em análise` / `⏸ Aguardando` |
+| `observacao` | texto livre |
+| `erro_classificacao` | `🔴 Sim - área errada` / `🟢 Não - classificação ok` / vazio |
+| `area_correta` | `Nuclear` / `Geração` / `Serviços Gerais` / etc (preencher se erro_classificacao = 🔴) |
+
+## Lookback configurável por fonte (novo)
+
+Fontes esparsas (CDTN, CCHEN, IAEA) agora usam janela de busca mais ampla:
+60 dias para CDTN, 30 dias para CCHEN e IAEA. Isso evita falsos positivos no
+alerta de "scraper quebrado" e captura bids de órgãos que publicam raramente.
+A configuração está em `LOOKBACK_DIAS_FONTE` no topo do `cfe_monitor.py`.
+
+## Roadmap
+
+**Fase 1 (✅ entregue):**
+
+- Token GitHub fora do código
+- Execução automática via GitHub Actions (cron 2x ao dia)
+- Logging estruturado
+- Detecção e alerta de scraper quebrado
+
+**Fase 2 (parcial — em andamento):**
+
+- ✅ Lookback por fonte (CDTN/CCHEN/IAEA)
+- ✅ `revisoes.csv` como fonte de verdade para Revisão/Observação
+- ✅ Coluna "Erro de Classificação?" no Excel
+- ⬜ Modularização do `cfe_monitor.py`
+- ⬜ Benchmark de baseline da acurácia
+
+**Fase 3 (em planejamento):**
+
+- Sonnet 4.6 + extended thinking
+- Princípios explícitos no prompt (instalação nuclear ≠ item nuclear)
+- Few-shot dinâmico a partir da coluna `erro_classificacao`
+- Classificação em 2 passadas
+
+**Fase 4 (idealizada):**
+
+- UI de edição inline no dashboard

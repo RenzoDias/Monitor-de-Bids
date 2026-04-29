@@ -108,7 +108,7 @@ jobs:
           if [ -f CFE_Dashboard.html ]; then cp CFE_Dashboard.html index.html; fi
           git config user.name  "cfe-monitor-bot"
           git config user.email "cfe-monitor-bot@users.noreply.github.com"
-          git add CFE_Monitor_Consolidado.xlsx CFE_Dashboard.html index.html status_fontes.json 2>/dev/null || true
+          git add CFE_Monitor_Consolidado.xlsx CFE_Dashboard.html index.html status_fontes.json revisoes.csv 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "Nenhuma mudanca para commitar."
           else
