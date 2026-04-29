@@ -1,15 +1,15 @@
 {
-  "ultima_execucao_utc": "2026-04-29T14:10:40+00:00",
+  "ultima_execucao_utc": "2026-04-29T18:07:59+00:00",
   "periodo": {
-    "ini": "2026-04-26",
+    "ini": "2026-04-28",
     "fim": "2026-04-29"
   },
   "contagens": {
-    "CFE": 98,
+    "CFE": 58,
     "ETN": 1,
     "INB": 17,
     "CDTN": 0,
-    "NASA": 170,
+    "NASA": 174,
     "Dioxitek": 8,
     "CCHEN": 1,
     "IAEA": 2
@@ -18,7 +18,7 @@
     "CFE": 0,
     "ETN": 0,
     "INB": 0,
-    "CDTN": 1,
+    "CDTN": 2,
     "NASA": 0,
     "Dioxitek": 0,
     "CCHEN": 0,
