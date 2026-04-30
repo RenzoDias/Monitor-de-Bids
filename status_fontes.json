@@ -1,27 +1,27 @@
 {
-  "ultima_execucao_utc": "2026-04-29T18:07:59+00:00",
+  "ultima_execucao_utc": "2026-04-30T01:05:54+00:00",
   "periodo": {
     "ini": "2026-04-28",
     "fim": "2026-04-29"
   },
   "contagens": {
-    "CFE": 58,
+    "CFE": 93,
     "ETN": 1,
     "INB": 17,
     "CDTN": 0,
-    "NASA": 174,
+    "NASA": 178,
     "Dioxitek": 8,
     "CCHEN": 1,
-    "IAEA": 2
+    "IAEA": 0
   },
   "falhas_consecutivas": {
     "CFE": 0,
     "ETN": 0,
     "INB": 0,
-    "CDTN": 2,
+    "CDTN": 1,
     "NASA": 0,
     "Dioxitek": 0,
     "CCHEN": 0,
-    "IAEA": 0
+    "IAEA": 1
   }
 }

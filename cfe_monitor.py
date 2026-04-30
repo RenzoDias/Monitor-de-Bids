@@ -98,58 +98,66 @@ GITHUB_USER   = "RenzoDias"
 GITHUB_REPO   = "Monitor-de-Bids"
 GITHUB_BRANCH = "main"
 
+# ─────────────────────────────────────────────────────────────
+#  SCHEMA ROSATOM-AWARE (substitui Area/Tipo do classificador antigo)
+#  - col "Area"  do Excel agora contém RELEVÂNCIA  (🟢 Alta / 🟡 Média / 🔴 Baixa)
+#  - col "Tipo"  do Excel agora contém FRENTE      (TVEL / ASE / Uranium One / ...)
+#  - col "Tags"  (nova, col 22) contém tags estratégicas detectadas por keywords
+# ─────────────────────────────────────────────────────────────
 AREAS_CORES = {
-    "Nuclear"        : "#C62828",
-    "Geração"        : "#E65100",
-    "Transmissão"    : "#1565C0",
-    "Distribuição"   : "#2E7D32",
-    "TI/Sistemas"    : "#6A1B9A",
-    "Obras/Civil"    : "#4E342E",
-    "Serviços Gerais": "#546E7A",
-    "Outro"          : "#757575",
+    "🟢 Alta"  : "#22C55E",  # verde — disputar
+    "🟡 Média" : "#F59E0B",  # âmbar — revisar manualmente
+    "🔴 Baixa" : "#94A3B8",  # cinza-azulado — Rosatom não disputa
 }
 AREAS_LISTA = list(AREAS_CORES.keys())
 
-KEYWORDS_NUCLEAR = [
-    # Termos inequivocamente nucleares
-    "nuclear",
-    "combustible nuclear",
-    "uranio",
-    "radioactiv",
-    "radiactiv",
-    "radioativ",
-    "radiativ",
-    "fonte radioativ",
-    "fontes radioativ",
-    "fonte de radia",
-    "laguna verde",
-    "cnlv",
-    "fision", "fisión",
-    "combustível nuclear",
-    "urânio",
-    "planta nuclear",
-    "central nuclear",
-    "reactor nuclear",     # só "reactor nuclear", não "reactor" sozinho
-    "reator nuclear",
-]
-
-# Termos que EXCLUEM Nuclear mesmo se um keyword aparecer
-# Ex: "reactor de amortiguamiento" é equipamento elétrico, não nuclear
-KEYWORDS_NAO_NUCLEAR = [
-    "amortiguamiento",    # reator de amortecimento — equipamento elétrico
-    "subestacion",        # contexto claro de subestação elétrica
-    "subestación",
-    "banco de reactores", # banco de reatores shunt — equipamento de transmissão
-    "reactor shunt",
-    "reactor en derivacion",
-    "compensacion reactiva",
-    "compensación reactiva",
-]
-
+# Cores das frentes Rosatom (equivalente ao TIPO_CORES_XL antigo)
 TIPO_CORES_XL = {
-    "Serviço":"1565C0","Material/Insumo":"2E7D32","Equipamento":"6A1B9A",
-    "Obra Civil":"4E342E","TI/Software":"00838F","Outro":"757575",
+    "TVEL"         : "1565C0",   # combustível, lítio-7, zircônio
+    "ASE"          : "6A1B9A",   # construção de usinas
+    "Uranium One"  : "E65100",   # mineração de urânio
+    "Metal Tech"   : "1B5E20",   # titânio, materiais estratégicos
+    "RWM"          : "B71C1C",   # rejeitos radioativos / CENTENA
+    "Healthcare"   : "00838F",   # medicina nuclear
+    "NovaWind"     : "558B2F",   # eólica
+    "Múltiplas"    : "37474F",
+    "—"            : "475569",
+    "Outro"        : "757575",   # fallback
 }
+
+# Tags estratégicas — detectadas por keywords na descrição (PT/ES/EN)
+TAG_KEYWORDS = {
+    "CENTENA"        : ["centena", "depósito final de rejeitos", "deposito final de rejeitos",
+                        "depósito de rejeitos radioativos", "deposito de rejeitos radioativos", "rwdf"],
+    "Caldas"         : ["caldas", "poços de caldas", "pocos de caldas"],
+    "Caetité"        : ["caetité", "caetite"],
+    "Santa Quitéria" : ["santa quitéria", "santa quiteria", "itataia"],
+    "Angra 3"        : ["angra 3", "angra iii", "angra-3"],
+    "SMR"            : ["smr ", " smr", "small modular reactor", "reator modular", "reactor modular"],
+    "Urânio"         : ["urânio", "uranio", "u3o8", "yellowcake", "ucp ", "concentrado de uranio",
+                        "concentrado de urânio"],
+    "Titânio"        : ["titânio", "titanio", "titanium"],
+    "Lítio-7"        : ["lítio-7", "litio-7", "lithium-7", "lítio enriquecido", "litio enriquecido"],
+    "Zircônio"       : ["zircônio", "zirconio", "zirconium", "zircaloy"],
+}
+
+# Frentes válidas que o Claude pode emitir (validação de output)
+FRENTES_VALIDAS = {"TVEL", "ASE", "Uranium One", "Metal Tech", "RWM",
+                   "Healthcare", "NovaWind", "Múltiplas", "—"}
+
+# ─── Keywords antigas (LEGADO — usadas pela migração para classificar
+# determinísticamente os ~880 bids antigos como 🔴 Baixa quando claramente
+# fora de escopo Rosatom). NÃO usadas pelo classificador novo. ──────────
+KEYWORDS_NUCLEAR_LEGACY = [
+    "nuclear", "combustible nuclear", "uranio", "radioactiv", "radiactiv",
+    "radioativ", "radiativ", "fonte radioativ", "fontes radioativ", "fonte de radia",
+    "laguna verde", "cnlv", "fision", "fisión", "combustível nuclear", "urânio",
+    "planta nuclear", "central nuclear", "reactor nuclear", "reator nuclear",
+]
+KEYWORDS_NAO_NUCLEAR_LEGACY = [
+    "amortiguamiento", "subestacion", "subestación", "banco de reactores",
+    "reactor shunt", "reactor en derivacion", "compensacion reactiva", "compensación reactiva",
+]
 
 COLUNAS = [
     ("Status",          14),  # 1
@@ -157,8 +165,8 @@ COLUNAS = [
     ("Origem",           10),  # 3
     ("Número",           26),  # 4
     ("Descrição",        55),  # 5
-    ("Área",             20),  # 6
-    ("Tipo",             18),  # 7
+    ("Relevância",       14),  # 6  ← 🟢 Alta / 🟡 Média / 🔴 Baixa (era "Área")
+    ("Frente",           18),  # 7  ← TVEL/ASE/Uranium One/... (era "Tipo")
     ("Tipo Proc.",       18),  # 8
     ("Contratação",      18),  # 9
     ("Estado",           14),  # 10
@@ -172,13 +180,17 @@ COLUNAS = [
     ("Revisão",          16),  # 18  ← vem de revisoes.csv
     ("Observação",       50),  # 19  ← vem de revisoes.csv
     ("Erro Class.",      14),  # 20  ← vem de revisoes.csv (🔴 Sim / 🟢 Não)
-    ("Área Correta",     20),  # 21  ← vem de revisoes.csv (preenchido se erro)
+    ("Relev. Correta",   18),  # 21  ← vem de revisoes.csv (preenchido se erro)
+    ("Tags",             22),  # 22  ← detectadas auto por keywords (CENTENA, Caldas, ...)
 ]
 COL_STATUS=1;COL_DATA=2;COL_ORIGEM=3;COL_NUM=4
+# COL_AREA → agora "Relevância", COL_TIPO → agora "Frente". Mantidos os nomes
+# de variável para minimizar diff e preservar referências em montar_linha/estilo_linha.
 COL_AREA=6;COL_TIPO=7;COL_PRAZO=11
 COL_ATUALIZADO=16;COL_ALTERADOS=17
 COL_REVISAO=18;COL_OBSERVACAO=19
 COL_ERRO_CLAS=20;COL_AREA_CORRETA=21
+COL_TAGS=22
 
 # Colunas ignoradas na comparação (mudam sempre, não indicam mudança real)
 COLUNAS_IGNORAR_COMPARACAO = {
@@ -190,7 +202,8 @@ COLUNAS_IGNORAR_COMPARACAO = {
     COL_REVISAO,        # Revisão — vem de revisoes.csv
     COL_OBSERVACAO,     # Observação — vem de revisoes.csv
     COL_ERRO_CLAS,      # Erro Classificação — vem de revisoes.csv
-    COL_AREA_CORRETA,   # Área Correta — vem de revisoes.csv
+    COL_AREA_CORRETA,   # Relev. Correta — vem de revisoes.csv
+    COL_TAGS,           # Tags — detectadas auto a cada run; não indica mudança da fonte
 }
 
 # Opções de revisão (para referência)
@@ -1534,83 +1547,138 @@ def buscar_iaea(session, ini: str, fim: str) -> list:
     return procs
 
 
+def detectar_tags(descricao: str) -> list:
+    """Detecta tags estratégicas (CENTENA, Caldas, Caetité, ...) por keyword
+    matching na descrição. Roda offline, sem API. Retorna lista ordenada."""
+    if not descricao:
+        return []
+    desc = descricao.lower()
+    encontradas = []
+    for tag, kws in TAG_KEYWORDS.items():
+        for kw in kws:
+            if kw in desc:
+                encontradas.append(tag)
+                break
+    return encontradas
+
+
 def construir_prompt(procs):
+    """
+    Prompt do classificador Rosatom-aware.
+    Persona: Analista Sênior de Compras e Desenvolvimento de Negócios da Rosatom AL.
+    Schema de output: relevancia | frente | justificativa (tags são detectadas
+    em paralelo no Python por detectar_tags(), não pedidas ao Claude).
+    """
     linhas = [
         f"{i}|{p.get('origem','?')}|{p.get('numero','')}|{p.get('descripcion','')}|{p.get('tipo_proc','')}|{p.get('tipo_contrat','')}"
         for i, p in enumerate(procs)
     ]
 
     origens_presentes = set(p.get("origem","") for p in procs)
-
-    # Contexto multilíngue — descreve cada origem presente
     ctx_parts = []
-    if ORIGEM_PADRAO in origens_presentes:
-        ctx_parts.append("CFE (Comision Federal de Electricidad, Mexico) — licitacoes em espanhol")
-    if ELETRONUCLEAR_ORIGEM in origens_presentes:
-        ctx_parts.append("Eletronuclear (operadora Angra 1 e Angra 2, Brasil) — licitacoes em portugues")
-    if INB_ORIGEM in origens_presentes:
-        ctx_parts.append("INB - Industrias Nucleares do Brasil — licitacoes em portugues")
-    if CDTN_ORIGEM in origens_presentes:
-        ctx_parts.append("CDTN/CNEN (Centro de Desenvolvimento Tecnologia Nuclear, Brasil) — licitacoes em portugues")
-    if NASA_ORIGEM in origens_presentes:
-        ctx_parts.append("NASA - Nucleoelectrica Argentina S.A. (opera Atucha I, Atucha II e Embalse) — licitacoes em espanhol")
-    if DIOXITEK_ORIGEM in origens_presentes:
-        ctx_parts.append("Dioxitek S.A. (Argentina, fabrica combustivel nuclear UO2 e Cobalto-60) — licitacoes em espanhol")
-    if CCHEN_ORIGEM in origens_presentes:
-        ctx_parts.append("CCHEN - Comision Chilena de Energia Nuclear (Chile, regula e pesquisa energia nuclear) — licitacoes em espanhol")
-    if IAEA_ORIGEM in origens_presentes:
-        ctx_parts.append("IAEA - International Atomic Energy Agency (Vienna, Austria) — licitacoes em ingles")
-    ctx = "Voce analisara licitacoes das seguintes origens:\n  " + "\n  ".join(ctx_parts) if ctx_parts else "Voce analisara licitacoes do setor nuclear e de energia."
+    if ORIGEM_PADRAO in origens_presentes:       ctx_parts.append("CFE (Comision Federal de Electricidad, México) — espanhol")
+    if ELETRONUCLEAR_ORIGEM in origens_presentes: ctx_parts.append("Eletronuclear (Angra 1/2, Brasil) — português")
+    if INB_ORIGEM in origens_presentes:          ctx_parts.append("INB - Indústrias Nucleares do Brasil — português")
+    if CDTN_ORIGEM in origens_presentes:         ctx_parts.append("CDTN/CNEN (Brasil, pesquisa nuclear) — português")
+    if NASA_ORIGEM in origens_presentes:         ctx_parts.append("NA-SA Nucleoeléctrica Argentina (Atucha/Embalse) — espanhol")
+    if DIOXITEK_ORIGEM in origens_presentes:     ctx_parts.append("Dioxitek S.A. (Argentina, UO2 e Co-60) — espanhol")
+    if CCHEN_ORIGEM in origens_presentes:        ctx_parts.append("CCHEN (Chile, regulação/pesquisa nuclear) — espanhol")
+    if IAEA_ORIGEM in origens_presentes:         ctx_parts.append("IAEA (Viena) — inglês")
+    ctx = "Origens das licitações:\n  " + "\n  ".join(ctx_parts) if ctx_parts else "Licitações do setor nuclear/energia da América Latina."
 
-    return f"""Voce e especialista em licitacoes do setor de energia e nuclear.
-As descricoes podem estar em PORTUGUES ou ESPANHOL — classifique corretamente independente do idioma.
+    return f"""Você é um Analista Sênior de Compras e Desenvolvimento de Negócios da Rosatom
+América Latina, subsidiária da estatal russa Rosatom — a maior corporação nuclear
+integrada do mundo. Sua função é avaliar licitações públicas e identificar quais
+representam OPORTUNIDADE COMERCIAL para a Rosatom AL.
+
+A Rosatom atua através de 7 frentes:
+  1. TVEL — combustível nuclear, lítio-7, zircônio, isótopos estáveis
+  2. ASE — construção de usinas (VVER-1000/1200, SMR), Angra 3, SMR Petrobras
+  3. RWM — gestão de resíduos radioativos, descomissionamento, PROJETO CENTENA
+  4. Metal Tech — titânio (esponja/lingotes), zircônio, materiais estratégicos
+  5. Healthcare — isótopos médicos e industriais, medicina nuclear
+  6. Uranium One/Tenex — mineração de urânio, conversão (Caldas, Caetité, Santa Quitéria)
+  7. NovaWind — energia eólica (menos ativo no Brasil)
+
+PROJETOS PRIORITÁRIOS (qualquer menção é candidato a 🟢):
+  CENTENA, Caldas/Poços de Caldas, Caetité, Santa Quitéria, Angra 3, SMR.
+
+═══ PRINCÍPIOS DE AVALIAÇÃO ═══
+
+P1. RELEVÂNCIA, não "é nuclear?". Sua decisão é se a Rosatom AL deveria
+    DISPUTAR essa licitação. Há itens nucleares-genéricos que Rosatom não vende
+    e itens não-rotulados como nucleares que são oportunidade clara.
+
+P2. INSTALAÇÃO NUCLEAR ≠ ITEM NUCLEAR. Estar em Angra, FCN, URA Caetité ou
+    qualquer instalação nuclear NÃO torna o item relevante. Rosatom NÃO disputa:
+    limpeza, jardinagem, vigilância, alimentação, veículos, uniformes, mobiliário,
+    copos descartáveis, água mineral, postes de concreto, software ERP/CAM
+    genérico, manutenção elétrica convencional, geração/transmissão/distribuição
+    clássica.
+
+P3. QUALIFICAÇÃO ESPECIAL = SINAL FORTE. Itens que exigem qualificação nuclear
+    formal (Class 1E, Q-grade, ASME III, RCC-M, certificação CNEN) ou em contato
+    com material radioativo são candidatos a 🟢.
+
+P4. MINERAÇÃO DE URÂNIO É CORE. Qualquer atividade ligada a mina de urânio
+    (Caetité, Caldas, Santa Quitéria) é interesse direto Uranium One/Tenex:
+    estudos geológicos, perfuração, caracterização de solo, movimentação de
+    minério, recuperação de tanques URA, gestão de pilha de estéril radioativo
+    → 🟢.
+
+P5. AMBIGUIDADE = 🟡 PARA REVISÃO. Quando não estiver claro se é commodity ou
+    item especializado, marque 🟡 com justificativa explicando o que precisa
+    ser verificado no termo de referência. O Renzo revisa pessoalmente esses casos.
+
+═══ EXEMPLOS (few-shots dos 13 INBs revisados) ═══
+
+[🟢 Alta]
+  "Recuperação tanque TQ-6305 na Unidade de Concentração de Urânio - URA"
+    → relevancia:🟢 Alta, frente:Uranium One, just:"Infra direta de mina de urânio Caetité — capability core"
+  "Estudos geológicos da pilha de estéril da URA"
+    → relevancia:🟢 Alta, frente:Uranium One, just:"Caracterização geológica de pilha estéril radioativa — capability TVEL/RWM"
+  "Movimentação de material rochoso desmontado, minério de oportunidade"
+    → relevancia:🟢 Alta, frente:Uranium One, just:"Operação direta de mineração de urânio"
+
+[🟡 Média]
+  "Usinagem de 1092 hastes de aço inoxidável austenítico"
+    → relevancia:🟡 Média, frente:Metal Tech, just:"Hastes em aço inox austenítico — verificar qualificação nuclear no TR"
+
+[🔴 Baixa — falsos positivos típicos do classificador antigo]
+  "Postes e cruzetas de concreto, posto CIF Caetité"
+    → relevancia:🔴 Baixa, frente:—, just:"Postes de concreto — infra comum, mesmo em Caetité"
+  "Coleta, transporte e destinação final de resíduos sólidos por coprocessamento"
+    → relevancia:🔴 Baixa, frente:—, just:"Resíduos não radioativos (coprocessamento) — fora de escopo"
+  "Software ESPIRIT CAM — atualização e suporte"
+    → relevancia:🔴 Baixa, frente:—, just:"Software CAM genérico — não é capability Rosatom"
+  "Equipamentos para ampliação de cobertura de rádios na FCN"
+    → relevancia:🔴 Baixa, frente:—, just:"Rede de rádios comum em instalação nuclear — fora de escopo"
+  "Suporte técnico e operacional ao Horto Florestal"
+    → relevancia:🔴 Baixa, frente:—, just:"Manejo de horto florestal — Serviços Gerais"
+  "Fornecimento parcelado de água mineral em garrafões"
+    → relevancia:🔴 Baixa, frente:—, just:"Commodity — Rosatom não disputa"
+  "Fornecimento de copo descartável 200ml"
+    → relevancia:🔴 Baixa, frente:—, just:"Commodity descartável — fora de escopo"
+  "Conservação e limpeza nas áreas da INB Caetité"
+    → relevancia:🔴 Baixa, frente:—, just:"Limpeza — Rosatom não disputa, mesmo em sítio Caetité"
+
+═══ DADOS A CLASSIFICAR ═══
+
 {ctx}
 
 PROCEDIMENTOS (indice|origem|numero|descricao|tipo_proc|tipo_contrato):
 {chr(10).join(linhas)}
 
-REGRA NUCLEAR — SEJA CONSERVADOR. So classifique como Nuclear se o item for DIRETAMENTE ligado a operacao de usinas nucleares:
-  ✅ NUCLEAR (qualquer origem):
-    - Combustivel nuclear / combustible nuclear, uranio, elementos combustiveis / elementos combustibles
-    - Componentes circuito primario: bomba primaria / bomba primaria, gerador de vapor / generador de vapor, pressurizador, vaso de pressao / vasija de presion
-    - Barras de controle / barras de control, mecanismos CRDM
-    - Instrumentacao nuclear: detectores de neutrons, monitores nucleares
-    - Protecao radiologica / proteccion radiologica: dosimetros, blindagem / blindaje
-    - Quimica circuito primario: acido borico / acido borico, hidrazina
-    - Residuos radioativos / residuos radiactivos das usinas
-    - Engenharia nuclear, analise de seguranca nuclear, suporte tecnico as plantas nucleares
-    - Maquina de recarga de combustivel / maquina de recarga
+═══ FORMATO DE OUTPUT ═══
 
-  ❌ NAO e Nuclear (exemplos em PT e ES):
-    - Limpeza / limpieza, conservacao / conservacion, jardinagem -> Servicos Gerais
-    - Vigilancia, seguranca / seguridad, guardia -> Servicos Gerais
-    - Alimentacao / alimentacion, restaurante, catering -> Servicos Gerais
-    - Veiculos / vehiculos, transporte pessoal / transporte personal, onibus / omnibus -> Servicos Gerais
-    - Uniforme, EPI basico, vestuario / indumentaria -> Servicos Gerais
-    - Mobiliario / mobiliario, armarios / armarios, carros / carros (moveis) -> Servicos Gerais
-    - Material de escritorio / insumos de oficina -> Servicos Gerais
-    - TI administrativo, computadores / computadoras, internet -> TI/Sistemas
-    - Obras civis / obras civiles, construcao / construccion -> Obras/Civil
-    - Combustivel diesel/gasolina para veiculos -> Material/Insumo
-    - Manutencao eletrica convencional / mantenimiento electrico convencional -> Distribuicao
-    - Seguro / seguro, plano de saude / plan de salud -> Servicos Gerais
+Para cada licitação retorne JSON sem markdown:
 
-  REGRA ESPECIAL CFE: "reactor de amortiguamiento", "reactor shunt", subestacao eletrica = NAO e Nuclear
-  REGRA ESPECIAL NASA: itens como armarios, carros, uniformes, alimentos = NAO e Nuclear mesmo estando numa usina nuclear
+[{{"indice":0,"relevancia":"🟢 Alta"|"🟡 Média"|"🔴 Baixa","frente":"TVEL"|"ASE"|"Uranium One"|"Metal Tech"|"RWM"|"Healthcare"|"NovaWind"|"Múltiplas"|"—","justificativa":"máx 25 palavras em linguagem de comprador"}}, ...]
 
-AREAS (escolha uma):
-"Nuclear"         -> insumo/servico DIRETO para operacao de usinas nucleares
-"Geracao"         -> geracao eletrica: termica, geotermica, solar, eolica, hidreletrica
-"Transmissao"     -> linhas de transmissao, subestacoes, alta tensao
-"Distribuicao"    -> redes distribuicao, medidores, transformadores convencionais
-"TI/Sistemas"     -> software, hardware, SCADA, telecomunicacoes
-"Obras/Civil"     -> construcao, obras civis, instalacoes, reforma
-"Servicos Gerais" -> limpeza, seguranca, veiculos, administrativo, alimentacao, mobiliario
-"Outro"
-
-TIPOS: "Servico"|"Material/Insumo"|"Equipamento"|"Obra Civil"|"TI/Software"|"Outro"
-
-JSON sem markdown: [{{"indice":0,"area":"...","tipo":"...","justificativa":"max 12 palavras"}},...]"""
+Regras:
+- frente = "—" quando relevancia = 🔴 Baixa
+- justificativa NUNCA repete a descrição; explica POR QUE é (ou não é) oportunidade
+- inclua TODOS os índices da lista, na ordem"""
 
 
 def analisar(procs):
@@ -1653,29 +1721,39 @@ def analisar(procs):
             print(f"  Resposta recebida: {txt[:200]!r}")
 
     for i, p in enumerate(procs):
-        c    = cls.get(i, {})
-        area = c.get("area", "Outro")
-        # Ajusta nomes com acentos de volta ao padrao
-        mapa = {"Geracao":"Geracao","Transmissao":"Transmissao","Distribuicao":"Distribuicao",
-                "Servicos Gerais":"Servicos Gerais"}
-        area = {
-            "Geracao":"Geração","Transmissao":"Transmissão","Distribuicao":"Distribuição",
-            "Servicos Gerais":"Serviços Gerais","Nuclear":"Nuclear",
-            "TI/Sistemas":"TI/Sistemas","Obras/Civil":"Obras/Civil","Outro":"Outro"
-        }.get(area, area)
+        c = cls.get(i, {})
 
-        desc = (p.get("descripcion","") + " " + p.get("tipo_contrat","")).lower()
+        # Schema novo: relevancia + frente + justificativa
+        relevancia = c.get("relevancia", "🟡 Média")
+        frente     = c.get("frente",     "—")
+        justif     = c.get("justificativa", "")
 
-        # Fallback keywords apenas para CFE
-        if area != "Nuclear" and p.get("origem") == ORIGEM_PADRAO:
-            tem_kw  = any(kw in desc for kw in KEYWORDS_NUCLEAR)
-            tem_exc = any(kw in desc for kw in KEYWORDS_NAO_NUCLEAR)
-            if tem_kw and not tem_exc:
-                area = "Nuclear"
+        # Normalização defensiva — emoji pode vir sem espaço
+        if relevancia and not any(relevancia.startswith(e) for e in ("🟢","🟡","🔴")):
+            r_low = relevancia.lower()
+            if "alta"  in r_low: relevancia = "🟢 Alta"
+            elif "média" in r_low or "media" in r_low: relevancia = "🟡 Média"
+            elif "baixa" in r_low: relevancia = "🔴 Baixa"
+            else: relevancia = "🟡 Média"
+        if relevancia not in AREAS_LISTA:
+            relevancia = "🟡 Média"
+        if frente not in FRENTES_VALIDAS:
+            frente = "—"
+        # Coerção: 🔴 Baixa sempre tem frente "—"
+        if relevancia == "🔴 Baixa":
+            frente = "—"
 
-        p["area"]          = area
-        p["tipo"]          = c.get("tipo", "Outro")
-        p["justificativa"] = c.get("justificativa", "")
+        # Tags detectadas no Python (offline) a partir da descrição + contratação
+        desc_full = (p.get("descripcion","") + " " + p.get("tipo_contrat",""))
+        tags = detectar_tags(desc_full)
+
+        # As colunas físicas Excel COL_AREA/COL_TIPO foram repurposed:
+        #   p["area"] = relevância,  p["tipo"] = frente
+        # Mantém os nomes de chave para reduzir diff no Excel/dashboard.
+        p["area"]          = relevancia
+        p["tipo"]          = frente
+        p["tags"]          = ", ".join(tags) if tags else ""
+        p["justificativa"] = justif
 
     return procs
 
@@ -1699,30 +1777,39 @@ def normalizar_val(v) -> str:
 
 
 def montar_linha(p, status="🆕 Novo", campos_alterados=""):
+    # Layout: 17 colunas geradas pela ferramenta + 4 do CSV revisões + 1 Tags = 22.
+    # Cols 18-21 (Revisão/Observação/Erro Class./Relev. Correta) são preservadas
+    # do Excel existente em salvar_excel(); aqui ficam vazias.
     return [
-        status,
-        normalizar_data(p.get("fecha_pub","")),
-        p.get("origem",    ORIGEM_PADRAO),
-        p.get("numero",    ""),
-        p.get("descripcion",""),
-        p.get("area",      "Outro"),
-        p.get("tipo",      "Outro"),
-        p.get("tipo_proc", ""),
-        p.get("tipo_contrat",""),
-        p.get("estado",    ""),
-        normalizar_data(p.get("prazo_sub","")),
-        normalizar_data(p.get("julgamento","")),
-        p.get("monto",     ""),
-        p.get("entidad",   ""),
-        p.get("justificativa",""),
-        datetime.now().strftime("%d/%m/%Y %H:%M"),
-        campos_alterados,   # col 17
+        status,                                    # 1
+        normalizar_data(p.get("fecha_pub","")),    # 2
+        p.get("origem",    ORIGEM_PADRAO),         # 3
+        p.get("numero",    ""),                    # 4
+        p.get("descripcion",""),                   # 5
+        p.get("area",      "🟡 Média"),            # 6  Relevância
+        p.get("tipo",      "—"),                   # 7  Frente
+        p.get("tipo_proc", ""),                    # 8
+        p.get("tipo_contrat",""),                  # 9
+        p.get("estado",    ""),                    # 10
+        normalizar_data(p.get("prazo_sub","")),    # 11
+        normalizar_data(p.get("julgamento","")),   # 12
+        p.get("monto",     ""),                    # 13
+        p.get("entidad",   ""),                    # 14
+        p.get("justificativa",""),                 # 15
+        datetime.now().strftime("%d/%m/%Y %H:%M"), # 16
+        campos_alterados,                          # 17
+        "",                                        # 18 Revisão (do CSV)
+        "",                                        # 19 Observação (do CSV)
+        "",                                        # 20 Erro Class. (do CSV)
+        "",                                        # 21 Relev. Correta (do CSV)
+        p.get("tags",      ""),                    # 22 Tags
     ]
 
 def estilo_linha(ws,row_n,vals,cor_bg):
-    area=str(vals[COL_AREA-1]) if len(vals)>=COL_AREA else "Outro"
-    tipo=str(vals[COL_TIPO-1]) if len(vals)>=COL_TIPO else "Outro"
-    nuclear=(area=="Nuclear")
+    relev = str(vals[COL_AREA-1]) if len(vals)>=COL_AREA else "🟡 Média"
+    frente= str(vals[COL_TIPO-1]) if len(vals)>=COL_TIPO else "—"
+    alta  = relev.startswith("🟢")
+    media = relev.startswith("🟡")
     for col,val in enumerate(vals[:len(COLUNAS)],1):
         c=ws.cell(row=row_n,column=col,value=val)
         c.border=borda(); c.alignment=Alignment(vertical="center",wrap_text=True); c.font=Font(size=9)
@@ -1730,22 +1817,30 @@ def estilo_linha(ws,row_n,vals,cor_bg):
             bg,fg=("1B5E20","FFFFFF") if "Novo" in str(val) else (("E65100","FFFFFF") if "Atual" in str(val) else ("B0BEC5","37474F"))
             c.fill=PatternFill("solid",fgColor=bg); c.font=Font(bold=True,size=9,color=fg)
             c.alignment=Alignment(horizontal="center",vertical="center")
-        elif col==COL_AREA:
-            c.fill=PatternFill("solid",fgColor=AREAS_CORES.get(area,"#757575").lstrip("#"))
+        elif col==COL_AREA:  # Relevância
+            c.fill=PatternFill("solid",fgColor=AREAS_CORES.get(relev,"#94A3B8").lstrip("#"))
             c.font=Font(bold=True,size=9,color="FFFFFF"); c.alignment=Alignment(horizontal="center",vertical="center")
-        elif col==COL_TIPO:
-            c.fill=PatternFill("solid",fgColor=TIPO_CORES_XL.get(tipo,"757575"))
+        elif col==COL_TIPO:  # Frente
+            c.fill=PatternFill("solid",fgColor=TIPO_CORES_XL.get(frente,"757575"))
             c.font=Font(bold=True,size=9,color="FFFFFF"); c.alignment=Alignment(horizontal="center",vertical="center")
         elif col==COL_ORIGEM:
             c.fill=PatternFill("solid",fgColor="004D40"); c.font=Font(bold=True,size=9,color="FFFFFF")
             c.alignment=Alignment(horizontal="center",vertical="center")
         elif col==COL_PRAZO and val:
-            c.fill=PatternFill("solid",fgColor="FFCDD2" if nuclear else "FFF9C4")
-            c.font=Font(bold=True,size=9,color="B71C1C" if nuclear else "E65100")
+            c.fill=PatternFill("solid",fgColor="FFCDD2" if alta else ("FFF9C4" if media else "F5F5F5"))
+            c.font=Font(bold=True,size=9,color="B71C1C" if alta else ("E65100" if media else "546E7A"))
             c.alignment=Alignment(horizontal="center",vertical="center")
         elif col==COL_ALTERADOS and val:
             c.fill=PatternFill("solid",fgColor="FFF3E0")
             c.font=Font(italic=True,size=8,color="E65100")
+            c.alignment=Alignment(vertical="center",wrap_text=True)
+        elif col==COL_TAGS and val:
+            # Tags em pílulas — texto em verde quando há projeto prioritário
+            tags_str = str(val)
+            prioritarias = ("CENTENA","Caldas","Caetité","Santa Quitéria","Angra 3","SMR")
+            tem_prio = any(t in tags_str for t in prioritarias)
+            c.fill=PatternFill("solid",fgColor="DCFCE7" if tem_prio else "EFF6FF")
+            c.font=Font(bold=tem_prio,size=8,color="14532D" if tem_prio else "1E40AF")
             c.alignment=Alignment(vertical="center",wrap_text=True)
         elif col==COL_REVISAO:
             revisao_cores = {
@@ -1762,7 +1857,12 @@ def estilo_linha(ws,row_n,vals,cor_bg):
             c.fill=PatternFill("solid",fgColor="E3F2FD")
             c.font=Font(italic=True,size=8,color="1565C0")
             c.alignment=Alignment(vertical="center",wrap_text=True)
-        elif nuclear: c.fill=PatternFill("solid",fgColor="FFEBEE"); c.font=Font(size=9,color="B71C1C")
+        elif alta:
+            # Linha 🟢 Alta — destaque verde claro
+            c.fill=PatternFill("solid",fgColor="DCFCE7"); c.font=Font(size=9,color="14532D")
+        elif media:
+            # Linha 🟡 Média — destaque amarelo claro
+            c.fill=PatternFill("solid",fgColor="FEF9C3"); c.font=Font(size=9,color="713F12")
         else: c.fill=PatternFill("solid",fgColor=cor_bg)
 
 def aplicar_revisoes_csv(arquivo_excel: str, arquivo_csv: str, registros: dict) -> dict:
@@ -1803,8 +1903,8 @@ def aplicar_revisoes_csv(arquivo_excel: str, arquivo_csv: str, registros: dict) 
     for num, rev in revisoes.items():
         if num in registros:
             linha = list(registros[num])
-            # Garante tamanho mínimo (cols 18-21)
-            while len(linha) < COL_AREA_CORRETA:
+            # Garante tamanho mínimo (cols 18-22)
+            while len(linha) < len(COLUNAS):
                 linha.append("")
             linha[COL_REVISAO-1]      = rev["revisao"]
             linha[COL_OBSERVACAO-1]   = rev["observacao"]
@@ -1972,19 +2072,24 @@ def salvar_excel(arquivo,procs_novos=None):
 # ─────────────────────────────────────────────────────────────
 def gerar_html(registros:dict, arquivo:str):
     print(f"Gerando dashboard HTML: {arquivo}")
+    # Schema atual (22 cols): area=Relevância, tipo=Frente, tags=col 22.
+    # Mantemos os nomes de chave area/tipo no JS por compatibilidade.
     campos=["status","data","origem","numero","descricao","area","tipo",
             "tipo_proc","contrato","estado","prazo","julgamento","valor",
             "entidade","justificativa","atualizado","campos_alterados",
-            "revisao","observacao"]
+            "revisao","observacao","erro_clas","relev_correta","tags"]
     dados=[]
     for vals in registros.values():
         while len(vals)<len(campos): vals.append("")
         obj={campos[i]:str(vals[i] or "") for i in range(len(campos))}
         dados.append(obj)
 
-    dados_json       = json.dumps(dados, ensure_ascii=False)
-    areas_cores_json = json.dumps(AREAS_CORES, ensure_ascii=False)
-    areas_lista_json = json.dumps(AREAS_LISTA, ensure_ascii=False)
+    dados_json         = json.dumps(dados, ensure_ascii=False)
+    areas_cores_json   = json.dumps(AREAS_CORES, ensure_ascii=False)
+    areas_lista_json   = json.dumps(AREAS_LISTA, ensure_ascii=False)
+    # Frentes em formato HTML hex (#xxxxxx) para o JS — TIPO_CORES_XL é sem '#'
+    frentes_cores_dict = {f: f"#{c}" for f, c in TIPO_CORES_XL.items()}
+    frentes_cores_json = json.dumps(frentes_cores_dict, ensure_ascii=False)
     ts = datetime.now().strftime('%d/%m/%Y %H:%M')
 
     html = f"""<!DOCTYPE html>
@@ -1992,7 +2097,7 @@ def gerar_html(registros:dict, arquivo:str):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CFE Monitor — Dashboard</title>
+<title>Rosatom AL — Monitor de Bids</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -2071,7 +2176,7 @@ tr:hover td{{background:#263548}}
 <body>
 <header>
   <div>
-    <h1>⚡ CFE Monitor — Dashboard de Licitações</h1>
+    <h1>⚛ Rosatom AL — Monitor de Bids</h1>
     <span id="header-sub">Carregando...</span>
   </div>
   <div style="text-align:right;line-height:1.6">
@@ -2085,12 +2190,12 @@ tr:hover td{{background:#263548}}
     <div class="kpi" style="--cor:#3b82f6"><div class="kpi-label">Total de Licitações</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub" id="kpi-sub-total"></div></div>
     <div class="kpi" style="--cor:#22c55e"><div class="kpi-label">Dias Monitorados</div><div class="kpi-value" id="kpi-dias">—</div><div class="kpi-sub" id="kpi-sub-dias"></div></div>
     <div class="kpi" style="--cor:#a78bfa"><div class="kpi-label">Média / Dia</div><div class="kpi-value" id="kpi-media">—</div><div class="kpi-sub">licitações/dia</div></div>
-    <div class="kpi" style="--cor:#ef4444"><div class="kpi-label">⚠ Nuclear</div><div class="kpi-value" id="kpi-nuclear">—</div><div class="kpi-sub">prioridade máxima</div></div>
+    <div class="kpi" style="--cor:#22c55e"><div class="kpi-label">🟢 Alta Relevância</div><div class="kpi-value" id="kpi-nuclear">—</div><div class="kpi-sub">disputar — prioridade Rosatom</div></div>
   </div>
 
-  <!-- Painel Nuclear -->
-  <div class="nuclear-panel" id="nuclear-panel">
-    <h2>⚠ Painel Nuclear — Acompanhamento por Revisão</h2>
+  <!-- Painel 🟢 Alta Relevância -->
+  <div class="nuclear-panel" id="nuclear-panel" style="background:#022c22;border-color:#14532d">
+    <h2 style="color:#86efac">🟢 Painel Alta Relevância — Acompanhamento por Revisão</h2>
     <div class="nuclear-breakdown" id="nuclear-breakdown">
       <div class="nuc-card" style="--cor:#ef4444" onclick="filtrarNuclear('')" id="nuc-pendente">
         <div class="nuc-card-label">🔴 Não revisados</div>
@@ -2130,18 +2235,26 @@ tr:hover td{{background:#263548}}
       </div>
 
       <div class="f-group">
-        <label>Área (múltipla)</label>
+        <label>Relevância (múltipla)</label>
         <div class="ms-wrap" id="ms-area">
-          <div class="ms-btn" onclick="toggleDropdown('ms-area')"><span id="ms-area-label">Todas as áreas</span></div>
+          <div class="ms-btn" onclick="toggleDropdown('ms-area')"><span id="ms-area-label">Todas</span></div>
           <div class="ms-dropdown" id="ms-area-dd"></div>
         </div>
       </div>
 
       <div class="f-group">
-        <label>Tipo (múltiplo)</label>
+        <label>Frente Rosatom (múltipla)</label>
         <div class="ms-wrap" id="ms-tipo">
-          <div class="ms-btn" onclick="toggleDropdown('ms-tipo')"><span id="ms-tipo-label">Todos os tipos</span></div>
+          <div class="ms-btn" onclick="toggleDropdown('ms-tipo')"><span id="ms-tipo-label">Todas</span></div>
           <div class="ms-dropdown" id="ms-tipo-dd"></div>
+        </div>
+      </div>
+
+      <div class="f-group">
+        <label>Tag estratégica (múltipla)</label>
+        <div class="ms-wrap" id="ms-tags">
+          <div class="ms-btn" onclick="toggleDropdown('ms-tags')"><span id="ms-tags-label">Todas</span></div>
+          <div class="ms-dropdown" id="ms-tags-dd"></div>
         </div>
       </div>
 
@@ -2190,8 +2303,8 @@ tr:hover td{{background:#263548}}
   </div>
 
   <div class="charts">
-    <div class="chart-box"><h3>Licitações por Dia</h3><div class="chart-wrap"><canvas id="chart-dias"></canvas></div></div>
-    <div class="chart-box"><h3>Distribuição por Área</h3><div class="chart-wrap"><canvas id="chart-areas"></canvas></div></div>
+    <div class="chart-box"><h3>Licitações por Dia (empilhado por Relevância)</h3><div class="chart-wrap"><canvas id="chart-dias"></canvas></div></div>
+    <div class="chart-box"><h3>Distribuição por Frente Rosatom</h3><div class="chart-wrap"><canvas id="chart-areas"></canvas></div></div>
   </div>
 
   <div class="table-wrap">
@@ -2204,11 +2317,11 @@ tr:hover td{{background:#263548}}
         <th onclick="st('data')">Data ↕</th>
         <th onclick="st('numero')">Número ↕</th>
         <th onclick="st('descricao')">Descrição ↕</th>
-        <th onclick="st('area')">Área ↕</th>
-        <th onclick="st('tipo')">Tipo ↕</th>
+        <th onclick="st('area')">Relevância ↕</th>
+        <th onclick="st('tipo')">Frente ↕</th>
+        <th>Tags</th>
         <th onclick="st('prazo')">Prazo Submissão ↕</th>
         <th onclick="st('julgamento')">Julgamento ↕</th>
-        <th onclick="st('estado')">Estado ↕</th>
         <th onclick="st('revisao')">Revisão ↕</th>
         <th onclick="st('campos_alterados')">Campos Alterados ↕</th>
         <th>Observação</th>
@@ -2222,8 +2335,9 @@ tr:hover td{{background:#263548}}
 
 <script>
 const DADOS_RAW      = {dados_json};
-const AREAS_CORES    = {areas_cores_json};
+const AREAS_CORES    = {areas_cores_json};   // Relevância → cor (🟢/🟡/🔴)
 const AREAS_LISTA    = {areas_lista_json};
+const FRENTES_CORES  = {frentes_cores_json}; // Frente → cor (TVEL/ASE/...)
 const POR_PAG        = 25;
 
 let dadosFiltrados = [];
@@ -2232,7 +2346,7 @@ let sortCol        = 'data';
 let sortAsc        = false;
 
 // Seleções multi-select
-const sel = {{ area: new Set(), tipo: new Set(), status: new Set(), origem: new Set(), revisao: new Set(), mes: new Set() }};
+const sel = {{ area: new Set(), tipo: new Set(), tags: new Set(), status: new Set(), origem: new Set(), revisao: new Set(), mes: new Set() }};
 
 // ── Init ────────────────────────────────────────────────────
 window.onload = () => {{
@@ -2248,9 +2362,20 @@ window.onload = () => {{
 }};
 
 // ── Multi-select ─────────────────────────────────────────────
+function extrairTagsUnicas() {{
+  const set = new Set();
+  DADOS_RAW.forEach(d => {{
+    if (!d.tags) return;
+    d.tags.split(',').forEach(t => {{ const x = t.trim(); if (x) set.add(x); }});
+  }});
+  return [...set].sort();
+}}
+
 function construirMultiSelects() {{
-  const areas   = [...new Set(DADOS_RAW.map(d=>d.area).filter(Boolean))].sort();
+  // Áreas = Relevâncias (na ordem 🟢→🟡→🔴, prioridade visual)
+  const areas   = AREAS_LISTA.filter(a => DADOS_RAW.some(d=>d.area===a));
   const tipos   = [...new Set(DADOS_RAW.map(d=>d.tipo).filter(Boolean))].sort();
+  const tags    = extrairTagsUnicas();
   const statuses= ['🆕 Novo','🔄 Atualizado','✅ Sem mudança'];
   const meses   = [...new Set(DADOS_RAW.map(d=>d.data.substring(0,7)).filter(Boolean))].sort().reverse();
   const mesesLabel = meses.map(m => {{
@@ -2261,8 +2386,9 @@ function construirMultiSelects() {{
 
   const origens = [...new Set(DADOS_RAW.map(d=>d.origem).filter(Boolean))].sort();
   criarMS('ms-origem',  'ms-origem-dd',  'ms-origem-label',  origens,  'origem',  null);
-  criarMS('ms-area',    'ms-area-dd',    'ms-area-label',    areas,    'area',    null);
-  criarMS('ms-tipo',    'ms-tipo-dd',    'ms-tipo-label',    tipos,    'tipo',    null);
+  criarMS('ms-area',    'ms-area-dd',    'ms-area-label',    areas,    'area',    AREAS_CORES);
+  criarMS('ms-tipo',    'ms-tipo-dd',    'ms-tipo-label',    tipos,    'tipo',    FRENTES_CORES);
+  criarMS('ms-tags',    'ms-tags-dd',    'ms-tags-label',    tags,     'tags',    null);
   criarMS('ms-status',  'ms-status-dd',  'ms-status-label',  statuses, 'status',  null);
   criarMS('ms-revisao', 'ms-revisao-dd', 'ms-revisao-label',
     ['✔ Seguido','✘ Não seguido','👁 Em análise','⏸ Aguardando','⬜ Não revisado'], 'revisao', null);
@@ -2309,9 +2435,9 @@ function toggleSel(key, val, labelId) {{
 
 function atualizarLabel(key, labelId) {{
   const s = sel[key];
-  const defaults = {{ area:'Todas as áreas', tipo:'Todos os tipos', status:'Todos', mes:'Todos' }};
+  const defaults = {{ area:'Todas', tipo:'Todas', tags:'Todas', status:'Todos', mes:'Todos', origem:'Todas', revisao:'Todas' }};
   document.getElementById(labelId).textContent =
-    s.size === 0 ? defaults[key] :
+    s.size === 0 ? (defaults[key] || 'Todos') :
     s.size === 1 ? [...s][0] :
     `${{s.size}} selecionados`;
 }}
@@ -2336,7 +2462,7 @@ function fecharTodos() {{
 
 // ── Filtros ──────────────────────────────────────────────────
 function resetarFiltros() {{
-  ['area','tipo','status','origem','mes','revisao'].forEach(k => {{
+  ['area','tipo','tags','status','origem','mes','revisao'].forEach(k => {{
     sel[k].clear();
     const ddId = `ms-${{k}}-dd`;
     document.querySelectorAll(`#${{ddId}} input[type=checkbox]`).forEach(cb=>cb.checked=false);
@@ -2356,6 +2482,10 @@ function aplicarFiltros() {{
   dadosFiltrados = DADOS_RAW.filter(d => {{
     if (sel.area.size   && !sel.area.has(d.area))              return false;
     if (sel.tipo.size   && !sel.tipo.has(d.tipo))              return false;
+    if (sel.tags.size) {{
+      const tagList = (d.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
+      if (!tagList.some(t=>sel.tags.has(t))) return false;
+    }}
     if (sel.status.size && !sel.status.has(d.status))          return false;
     if (sel.mes.size    && !sel.mes.has(d.data.substring(0,7))) return false;
     if (dIni && d.data < dIni) return false;
@@ -2382,25 +2512,25 @@ function aplicarFiltros() {{
 function st(col) {{ if(sortCol===col) sortAsc=!sortAsc; else {{sortCol=col;sortAsc=true;}} aplicarFiltros(); }}
 
 // ── KPIs ────────────────────────────────────────────────────
-// ── Painel Nuclear ──────────────────────────────────────────
+// ── Painel 🟢 Alta Relevância ─────────────────────────────────
 let filtroNuclearAtivo = null;
 
 function atualizarPainelNuclear() {{
   // Sempre usa DADOS_RAW (base completa, não filtrada)
-  const nucleares = DADOS_RAW.filter(d => d.area === 'Nuclear');
-  const pendentes  = nucleares.filter(d => !d.revisao || !d.revisao.trim()).length;
-  const analise    = nucleares.filter(d => d.revisao === '👁 Em análise').length;
-  const aguardando = nucleares.filter(d => d.revisao === '⏸ Aguardando').length;
-  const seguido    = nucleares.filter(d => d.revisao === '✔ Seguido').length;
-  const naoSeguido = nucleares.filter(d => d.revisao === '✘ Não seguido').length;
+  const altas = DADOS_RAW.filter(d => d.area === '🟢 Alta');
+  const pendentes  = altas.filter(d => !d.revisao || !d.revisao.trim()).length;
+  const analise    = altas.filter(d => d.revisao === '👁 Em análise').length;
+  const aguardando = altas.filter(d => d.revisao === '⏸ Aguardando').length;
+  const seguido    = altas.filter(d => d.revisao === '✔ Seguido').length;
+  const naoSeguido = altas.filter(d => d.revisao === '✘ Não seguido').length;
 
   document.getElementById('nuc-val-pendente').textContent   = pendentes;
   document.getElementById('nuc-val-analise').textContent    = analise;
   document.getElementById('nuc-val-aguardando').textContent = aguardando;
   document.getElementById('nuc-val-seguido').textContent    = seguido + (naoSeguido ? ` / ✘ ${{naoSeguido}}` : '');
 
-  // Esconde painel se não há nucleares
-  document.getElementById('nuclear-panel').style.display = nucleares.length ? 'block' : 'none';
+  // Esconde painel se não há altas
+  document.getElementById('nuclear-panel').style.display = altas.length ? 'block' : 'none';
 }}
 
 function filtrarNuclear(revisaoVal) {{
@@ -2408,7 +2538,6 @@ function filtrarNuclear(revisaoVal) {{
   if (filtroNuclearAtivo === revisaoVal) {{
     filtroNuclearAtivo = null;
     document.querySelectorAll('.nuc-card').forEach(c => c.classList.remove('active'));
-    // Limpa filtros de área e revisão
     sel.area.clear(); sel.revisao.clear();
     document.querySelectorAll('#ms-area-dd input, #ms-revisao-dd input').forEach(cb => cb.checked=false);
     atualizarLabel('area','ms-area-label');
@@ -2416,11 +2545,10 @@ function filtrarNuclear(revisaoVal) {{
   }} else {{
     filtroNuclearAtivo = revisaoVal;
     document.querySelectorAll('.nuc-card').forEach(c => c.classList.remove('active'));
-    // Marca card ativo
     const ids = {{'':'nuc-pendente','👁 Em análise':'nuc-analise','⏸ Aguardando':'nuc-aguardando','✔ Seguido':'nuc-seguido'}};
     if (ids[revisaoVal]) document.getElementById(ids[revisaoVal]).classList.add('active');
-    // Filtra por Nuclear + revisão
-    sel.area.clear(); sel.area.add('Nuclear');
+    // Filtra por 🟢 Alta + revisão
+    sel.area.clear(); sel.area.add('🟢 Alta');
     sel.revisao.clear();
     if (revisaoVal === '') {{
       sel.revisao.add('⬜ Não revisado');
@@ -2439,7 +2567,7 @@ function atualizarKPIs() {{
   const datas  = new Set(dadosFiltrados.map(d=>d.data).filter(Boolean));
   const dias   = datas.size;
   const media  = dias>0 ? (total/dias).toFixed(1) : '—';
-  const nuc    = dadosFiltrados.filter(d=>d.area==='Nuclear').length;
+  const nuc    = dadosFiltrados.filter(d=>d.area==='🟢 Alta').length;
   const novos  = dadosFiltrados.filter(d=>d.status.includes('Novo')).length;
   document.getElementById('kpi-total').textContent    = total.toLocaleString();
   document.getElementById('kpi-sub-total').textContent= `${{novos}} novos nesta atualização`;
@@ -2489,18 +2617,23 @@ function atualizarGraficos() {{
     }}
   }});
 
-  const cntArea={{}};
-  dadosFiltrados.forEach(d => cntArea[d.area]=(cntArea[d.area]||0)+1);
-  const areasComDados = Object.entries(cntArea).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  // Doughnut agora mostra distribuição por FRENTE (campo d.tipo).
+  // Excluímos "—" (frente vazia das 🔴 Baixa) para focar nas oportunidades reais.
+  const cntFrente={{}};
+  dadosFiltrados.forEach(d => {{
+    if (!d.tipo || d.tipo === '—') return;
+    cntFrente[d.tipo]=(cntFrente[d.tipo]||0)+1;
+  }});
+  const frentesComDados = Object.entries(cntFrente).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
 
   if(chartAreas) chartAreas.destroy();
   chartAreas = new Chart(document.getElementById('chart-areas'), {{
     type:'doughnut',
     data:{{
-      labels: areasComDados.map(([a])=>a),
+      labels: frentesComDados.map(([a])=>a),
       datasets:[{{
-        data: areasComDados.map(([,v])=>v),
-        backgroundColor: areasComDados.map(([a])=>AREAS_CORES[a]||'#757575'),
+        data: frentesComDados.map(([,v])=>v),
+        backgroundColor: frentesComDados.map(([a])=>FRENTES_CORES[a]||'#757575'),
         borderWidth:2, borderColor:'#1e293b',
       }}]
     }},
@@ -2536,11 +2669,18 @@ function renderTabela() {{
 
   pagina.forEach(d => {{
     const tr=document.createElement('tr');
-    if(d.area==='Nuclear') tr.className='nuclear-row';
-    const areaCor  = AREAS_CORES[d.area]||'#757575';
-    const stBadge  = d.status.includes('Novo')?'badge-novo':(d.status.includes('Atualiz')?'badge-atualizado':'badge-sem');
-    const prazoC   = isPrazoUrgente(d.prazo)?'prazo-urgente':'prazo-normal';
-    const stLabel  = d.status.replace('🆕 ','').replace('🔄 ','').replace('✅ ','');
+    if(d.area==='🟢 Alta') tr.className='nuclear-row';
+    const areaCor   = AREAS_CORES[d.area]||'#94a3b8';
+    const frenteCor = FRENTES_CORES[d.tipo]||'#475569';
+    const stBadge   = d.status.includes('Novo')?'badge-novo':(d.status.includes('Atualiz')?'badge-atualizado':'badge-sem');
+    const prazoC    = isPrazoUrgente(d.prazo)?'prazo-urgente':'prazo-normal';
+    const stLabel   = d.status.replace('🆕 ','').replace('🔄 ','').replace('✅ ','');
+    const tagsHtml  = (d.tags||'').split(',').map(t=>t.trim()).filter(Boolean)
+        .map(t=>{{
+          const prio = ['CENTENA','Caldas','Caetité','Santa Quitéria','Angra 3','SMR'].includes(t);
+          const bg = prio ? '#15803d' : '#1e3a8a';
+          return `<span class="badge" style="background:${{bg}};color:#fff;font-size:.65rem;margin:1px">${{t}}</span>`;
+        }}).join('');
     tr.innerHTML=`
       <td><span class="badge ${{stBadge}}">${{stLabel}}</span></td>
       ${{renderOrigem(d.origem)}}
@@ -2548,10 +2688,10 @@ function renderTabela() {{
       <td style="font-family:monospace;font-size:.76rem;white-space:nowrap">${{d.numero}}</td>
       <td style="min-width:180px;max-width:280px">${{d.descricao}}</td>
       <td><span class="area-badge" style="background:${{areaCor}}">${{d.area}}</span></td>
-      <td style="font-size:.76rem">${{d.tipo}}</td>
+      <td>${{d.tipo && d.tipo !== '—' ? `<span class="area-badge" style="background:${{frenteCor}};font-size:.7rem">${{d.tipo}}</span>` : '<span style="opacity:.3">—</span>'}}</td>
+      <td style="min-width:120px">${{tagsHtml || '<span style="opacity:.3">—</span>'}}</td>
       <td class="${{prazoC}}" style="white-space:nowrap">${{formatDataCompleta(d.prazo)}}</td>
       <td style="font-size:.76rem;opacity:.8;white-space:nowrap">${{formatDataCompleta(d.julgamento)}}</td>
-      <td style="font-size:.76rem;opacity:.65">${{d.estado}}</td>
       ${{renderRevisao(d.revisao)}}
       <td style="font-size:.73rem;color:#fb923c;font-style:italic">${{d.campos_alterados||''}}</td>
       <td style="font-size:.75rem;color:#93c5fd;font-style:italic;min-width:160px">${{d.observacao||''}}</td>
@@ -2870,11 +3010,12 @@ def main():
         for p in procs:
             num = str(p.get("numero","")).strip()
             if num and num in base_existente:
-                # Já existe: reaproveita área/tipo/justificativa da base
+                # Já existe: reaproveita relevância (area)/frente (tipo)/justificativa/tags da base
                 linha_ant = base_existente[num]
-                p["area"]          = str(linha_ant[COL_AREA-1]  if len(linha_ant)>=COL_AREA  else "Outro")
-                p["tipo"]          = str(linha_ant[COL_TIPO-1]  if len(linha_ant)>=COL_TIPO  else "Outro")
+                p["area"]          = str(linha_ant[COL_AREA-1]  if len(linha_ant)>=COL_AREA  else "🟡 Média")
+                p["tipo"]          = str(linha_ant[COL_TIPO-1]  if len(linha_ant)>=COL_TIPO  else "—")
                 p["justificativa"] = str(linha_ant[14]          if len(linha_ant)>=15        else "")
+                p["tags"]          = str(linha_ant[COL_TAGS-1]  if len(linha_ant)>=COL_TAGS  else "")
                 # Preserva data de publicação original para evitar falsos "Atualizado"
                 data_orig = str(linha_ant[COL_DATA-1] if len(linha_ant)>=COL_DATA else "").strip()
                 if data_orig:
@@ -2916,9 +3057,10 @@ def main():
                     "prazo_sub"    : normalizar_data(_g(11)),
                     "julgamento"   : normalizar_data(_g(12)),
                     "monto"        : _g(13),
-                    "area"         : _g(6),
-                    "tipo"         : _g(7),
+                    "area"         : _g(6),    # Relevância (esquema novo)
+                    "tipo"         : _g(7),    # Frente (esquema novo)
                     "justificativa": _g(15),
+                    "tags"         : _g(COL_TAGS),
                     "id_interno"   : "",
                 }
                 procs_base_extras.append(p_extra)
@@ -2945,11 +3087,12 @@ def main():
                        if str(ln[COL_STATUS-1] if len(ln)>=COL_STATUS else "").startswith(("🆕","🔄"))}}
         areas_base = [p for p in todos if str(p.get("numero","")).strip() in novos_nums] or todos
         label = "novos/atualizados" if novos_nums else "total"
-        areas = Counter(p.get("area","Outro") for p in areas_base)
+        # area = Relevância (🟢 Alta / 🟡 Média / 🔴 Baixa)
+        areas = Counter(p.get("area","🟡 Média") for p in areas_base)
         print()
-        print(f"  Áreas ({label}):")
+        print(f"  Relevância ({label}):")
         for area,qtd in sorted(areas.items(), key=lambda x:-x[1]):
-            print(f"    {area:<22}: {qtd}{' ⚠' if area=='Nuclear' else ''}")
+            print(f"    {area:<22}: {qtd}{' ⚠' if area=='🟢 Alta' else ''}")
 
         print(f"\n  Excel : {args.excel}")
         print(f"  HTML  : {args.html}")

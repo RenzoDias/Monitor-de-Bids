@@ -25,3 +25,6 @@ Thumbs.db
 # NOTA:
 # CFE_Monitor_Consolidado.xlsx é commitado — é o estado persistente entre runs.
 # CFE_Dashboard.html é commitado — servido pelo GitHub Pages.
+migracao_api_cache.json
+migracao_api_cache.json
+migracao_api_cache.json
